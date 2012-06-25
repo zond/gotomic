@@ -11,7 +11,7 @@ type thing interface{}
 
 type element struct {
 	value   thing
-	deleted int8
+	deleted int32
 	next    unsafe.Pointer
 }
 func (self *element) unsafe() unsafe.Pointer {
@@ -20,51 +20,53 @@ func (self *element) unsafe() unsafe.Pointer {
 
 type iterator struct {
 	list *List
-	last *element
-	current *element
-	next *element
+	last unsafe.Pointer
+	current unsafe.Pointer
+	next unsafe.Pointer
 }
-
 func newIterator(l *List) *iterator {
-	rval := &iterator{l, nil, nil, (*element)(l.head)}
+	rval := &iterator{l, nil, nil, l.head}
 	rval.ff()
 	return rval
 }
 func (self *iterator) Delete() {
-	
+	if self.current == nil {
+		return
+	}
+	atomic.StoreInt32(&((*element)(self.current).deleted), 1) 
+	if self.current == self.list.head {
+		if atomic.CompareAndSwapPointer(&(self.list.head), self.current, self.next) {
+			atomic.AddInt64(&(self.list.size), -1)
+		}
+	} else {
+		if atomic.CompareAndSwapPointer(&((*element)(self.last).next), self.current, self.next) {
+			atomic.AddInt64(&(self.list.size), -1)
+		}
+	}
 }
 func (self *iterator) ff() {
 	for {
 		if self.next == nil {
 			return
 		}
-		if self.next.deleted != 0 {
-			if unsafe.Pointer(self.next) == self.list.head {
-				if atomic.CompareAndSwapPointer(&(self.list.head), self.next.unsafe(), self.next.next) {
-					atomic.AddInt64(&(self.list.size), -1)
-				}
-			} else {
-				if atomic.CompareAndSwapPointer(&(self.last.next), self.next.unsafe(), self.next.next) {
-					atomic.AddInt64(&(self.list.size), -1)
-				}
-			}
-			self.step()
-		} else {
-			return
+		if (*element)(atomic.LoadPointer(&(self.next))).deleted == 0 {
+			return 
 		}
+		self.step()
+		self.Delete()
 	}
 }
 func (self *iterator) step() {
 	self.last = self.current
 	self.current = self.next
-	self.next = (*element)(self.next.next)
+	self.next = (*element)(self.next).next
 }
 func (self *iterator) HasNext() bool {
 	return self.next != nil
 }
 func (self *iterator) nextAny() thing {
 	if self.HasNext() {
-		el := self.next
+		el := (*element)(self.next)
 		self.step()
 		return el.value
 	}
@@ -113,13 +115,13 @@ func (self *List) Push(t thing) {
 	self.Push(t)
 }
 func (self *List) Pop() thing {
-	head := (*element)(self.head)
-	if head == nil {
+	if self.head == nil {
 		return nil
 	}
-	if atomic.CompareAndSwapPointer(&(self.head), self.head, head.next) {
+	head := self.head
+	if atomic.CompareAndSwapPointer(&(self.head), head, (*element)(head).next) {
 		atomic.AddInt64(&(self.size), -1)
-		return head.value
+		return (*element)(head).value
 	}
 	return self.Pop()
 }
