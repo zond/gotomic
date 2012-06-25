@@ -21,11 +21,12 @@ func (self *element) unsafe() unsafe.Pointer {
 type iterator struct {
 	list *List
 	last *element
+	current *element
 	next *element
 }
 
 func newIterator(l *List) *iterator {
-	rval := &iterator{l, nil, (*element)(l.head)}
+	rval := &iterator{l, nil, nil, (*element)(l.head)}
 	rval.ff()
 	return rval
 }
@@ -47,11 +48,16 @@ func (self *iterator) ff() {
 					atomic.AddInt64(&(self.list.size), -1)
 				}
 			}
-			self.next = (*element)(self.next.next)
+			self.step()
 		} else {
 			return
 		}
 	}
+}
+func (self *iterator) step() {
+	self.last = self.current
+	self.current = self.next
+	self.next = (*element)(self.next.next)
 }
 func (self *iterator) HasNext() bool {
 	return self.next != nil
@@ -59,7 +65,7 @@ func (self *iterator) HasNext() bool {
 func (self *iterator) nextAny() thing {
 	if self.HasNext() {
 		el := self.next
-		self.next = (*element)(el.next)
+		self.step()
 		return el.value
 	}
 	return nil
