@@ -1,39 +1,80 @@
-
 package gotomic
 
 import (
-	"unsafe"
 	"bytes"
-	"sync/atomic"
 	"fmt"
+	"sync/atomic"
+	"unsafe"
 )
 
 type thing interface{}
 
 type element struct {
-	value thing
-	next unsafe.Pointer
+	value   thing
+	deleted int8
+	next    unsafe.Pointer
+}
+func (self *element) unsafe() unsafe.Pointer {
+	return unsafe.Pointer(self)
 }
 
 type iterator struct {
-	next unsafe.Pointer
+	list *List
+	last *element
+	next *element
+}
+
+func newIterator(l *List) *iterator {
+	rval := &iterator{l, nil, (*element)(l.head)}
+	rval.ff()
+	return rval
+}
+func (self *iterator) Delete() {
+	
+}
+func (self *iterator) ff() {
+	for {
+		if self.next == nil {
+			return
+		}
+		if self.next.deleted != 0 {
+			if unsafe.Pointer(self.next) == self.list.head {
+				if atomic.CompareAndSwapPointer(&(self.list.head), self.next.unsafe(), self.next.next) {
+					atomic.AddInt64(&(self.list.size), -1)
+				}
+			} else {
+				if atomic.CompareAndSwapPointer(&(self.last.next), self.next.unsafe(), self.next.next) {
+					atomic.AddInt64(&(self.list.size), -1)
+				}
+			}
+			self.next = (*element)(self.next.next)
+		} else {
+			return
+		}
+	}
 }
 func (self *iterator) HasNext() bool {
 	return self.next != nil
 }
-func (self *iterator) Next() thing {
+func (self *iterator) nextAny() thing {
 	if self.HasNext() {
-		el := (*element)(self.next)
-		self.next = el.next
+		el := self.next
+		self.next = (*element)(el.next)
 		return el.value
 	}
 	return nil
+}
+func (self *iterator) Next() thing {
+	rval := self.nextAny()
+	self.ff()
+	return rval
 }
 
 type List struct {
 	head unsafe.Pointer
 	size int64
 }
+
 func NewList() *List {
 	return &List{}
 }
@@ -55,11 +96,11 @@ func (self *List) Size() int {
 	return int(self.size)
 }
 func (self *List) Iterator() *iterator {
-	return &iterator{self.head}
+	return newIterator(self)
 }
 func (self *List) Push(t thing) {
-	new_head := &element{t, self.head}
-	if atomic.CompareAndSwapPointer(&(self.head), new_head.next, unsafe.Pointer(new_head)) {
+	new_head := &element{t, 0, self.head}
+	if atomic.CompareAndSwapPointer(&(self.head), new_head.next, new_head.unsafe()) {
 		atomic.AddInt64(&(self.size), 1)
 		return
 	}

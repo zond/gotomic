@@ -1,10 +1,8 @@
-
 package gotomic
 
 import (
-	"testing"
 	"reflect"
-	"fmt"
+	"testing"
 )
 
 func TestListCreation(t *testing.T) {
@@ -22,14 +20,14 @@ func checkListEquality(t *testing.T, l *List, things []thing) {
 					t.Error(v, "should equal", thing)
 				}
 			} else {
-				t.Error("list should have next")
+				t.Error(l, "should have next")
 			}
 		}
 		if i.HasNext() {
-			t.Error("list should not have next")
+			t.Error(l, "should not have next")
 		}
 	} else {
-		t.Error("list should have length", len(things), "but has length", l.Size())
+		t.Error(l, "should have length", len(things), "but has length", l.Size())
 	}
 }
 
@@ -40,7 +38,7 @@ func TestListPushing(t *testing.T) {
 	l.Push("på")
 	checkListEquality(t, l, []thing{"på", "hej"})
 	l.Push("dig")
-	checkListEquality(t, l, []thing{"dig","på", "hej"})
+	checkListEquality(t, l, []thing{"dig", "på", "hej"})
 }
 
 func TestListPopping(t *testing.T) {
@@ -48,7 +46,7 @@ func TestListPopping(t *testing.T) {
 	l.Push("hej")
 	l.Push("på")
 	l.Push("dig")
-	checkListEquality(t, l, []thing{"dig","på", "hej"})
+	checkListEquality(t, l, []thing{"dig", "på", "hej"})
 	if l.Pop() != "dig" {
 		t.Error("should be dig")
 	}
