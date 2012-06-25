@@ -60,3 +60,35 @@ func TestListPopping(t *testing.T) {
 	}
 	checkListEquality(t, l, []thing{})
 }
+
+func TestListDeletion(t *testing.T) {
+	l := NewList()
+	l.Push("hej")
+	l.Push("på")
+	l.Push("dig")
+	l.Push("din")
+	l.Push("gamla")
+	l.Push("biff")
+	checkListEquality(t, l, []thing{"biff", "gamla", "din", "dig", "på", "hej"})
+	i := l.Iterator()
+	i.Delete()
+	checkListEquality(t, l, []thing{"biff", "gamla", "din", "dig", "på", "hej"})
+	if i.Next() != "biff" {
+		t.Error("should be biff")
+	}
+	i.Delete()
+	checkListEquality(t, l, []thing{"gamla", "din", "dig", "på", "hej"})
+	if i.Next() != "gamla" {
+		t.Error("should be gamla")
+	}
+	if i.Next() != "din" {
+		t.Error("should be din")
+	}
+	if i.Next() != "dig" {
+		t.Error("should be dig")
+	}
+	i.Delete()
+	checkListEquality(t, l, []thing{"gamla", "din", "på", "hej"})
+	i.Delete()
+	checkListEquality(t, l, []thing{"gamla", "din", "på", "hej"})
+}

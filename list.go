@@ -34,7 +34,7 @@ func (self *iterator) Delete() {
 		return
 	}
 	atomic.StoreInt32(&((*element)(self.current).deleted), 1) 
-	if self.current == self.list.head {
+	if self.last == nil {
 		if atomic.CompareAndSwapPointer(&(self.list.head), self.current, self.next) {
 			atomic.AddInt64(&(self.list.size), -1)
 		}
