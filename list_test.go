@@ -12,6 +12,7 @@ func (self s) Compare(o interface{}) int {
 
 func TestTest(t *testing.T) {
 	nr := new(nodeRef)
+	fmt.Println(nr)
 	nr.push(s("hej"))
 	nr.push(s("haj"))
 	nr.push(s("hoj"))
