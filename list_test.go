@@ -1,94 +1,19 @@
 package gotomic
 
 import (
-	"reflect"
+	"fmt"
 	"testing"
 )
 
-func TestListCreation(t *testing.T) {
-	l := NewList()
-	checkListEquality(t, l, []thing{})
+type s string
+func (self s) Compare(o interface{}) int {
+	return 0
 }
 
-func checkListEquality(t *testing.T, l *List, things []thing) {
-	if l.Size() == len(things) {
-		i := l.Iterator()
-		for _, thing := range things {
-			if i.HasNext() {
-				v := i.Next()
-				if !reflect.DeepEqual(v, thing) {
-					t.Error(v, "should equal", thing)
-				}
-			} else {
-				t.Error(l, "should have next")
-			}
-		}
-		if i.HasNext() {
-			t.Error(l, "should not have next")
-		}
-	} else {
-		t.Error(l, "should have length", len(things), "but has length", l.Size())
-	}
-}
-
-func TestListPushing(t *testing.T) {
-	l := NewList()
-	l.Push("hej")
-	checkListEquality(t, l, []thing{"hej"})
-	l.Push("på")
-	checkListEquality(t, l, []thing{"på", "hej"})
-	l.Push("dig")
-	checkListEquality(t, l, []thing{"dig", "på", "hej"})
-}
-
-func TestListPopping(t *testing.T) {
-	l := NewList()
-	l.Push("hej")
-	l.Push("på")
-	l.Push("dig")
-	checkListEquality(t, l, []thing{"dig", "på", "hej"})
-	if l.Pop() != "dig" {
-		t.Error("should be dig")
-	}
-	checkListEquality(t, l, []thing{"på", "hej"})
-	if l.Pop() != "på" {
-		t.Error("should be på")
-	}
-	checkListEquality(t, l, []thing{"hej"})
-	if l.Pop() != "hej" {
-		t.Error("should be hej")
-	}
-	checkListEquality(t, l, []thing{})
-}
-
-func TestListDeletion(t *testing.T) {
-	l := NewList()
-	l.Push("hej")
-	l.Push("på")
-	l.Push("dig")
-	l.Push("din")
-	l.Push("gamla")
-	l.Push("biff")
-	checkListEquality(t, l, []thing{"biff", "gamla", "din", "dig", "på", "hej"})
-	i := l.Iterator()
-	i.Delete()
-	checkListEquality(t, l, []thing{"biff", "gamla", "din", "dig", "på", "hej"})
-	if i.Next() != "biff" {
-		t.Error("should be biff")
-	}
-	i.Delete()
-	checkListEquality(t, l, []thing{"gamla", "din", "dig", "på", "hej"})
-	if i.Next() != "gamla" {
-		t.Error("should be gamla")
-	}
-	if i.Next() != "din" {
-		t.Error("should be din")
-	}
-	if i.Next() != "dig" {
-		t.Error("should be dig")
-	}
-	i.Delete()
-	checkListEquality(t, l, []thing{"gamla", "din", "på", "hej"})
-	i.Delete()
-	checkListEquality(t, l, []thing{"gamla", "din", "på", "hej"})
+func TestTest(t *testing.T) {
+	nr := new(nodeRef)
+	nr.push(s("hej"))
+	nr.push(s("haj"))
+	nr.push(s("hoj"))
+	fmt.Println(nr)
 }
