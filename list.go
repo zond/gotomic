@@ -6,10 +6,6 @@ import (
 	"unsafe"
 )
 
-type Comparable interface {
-	Compare(thing) int
-}
-
 type thing interface{}
 
 type node struct {
@@ -38,14 +34,6 @@ func (self *nodeRef) node() *node {
 		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(next_ok))
 	}
 	return next_ok
-}
-func (self *nodeRef) inject(c Comparable) {
-	current := self.node()
-	if c.Compare(current) > 0 {
-		current.next.inject(c)
-	} else {
-		self.push(c)
-	}
 }
 func (self *nodeRef) toSlice() []thing {
 	var rval []thing
