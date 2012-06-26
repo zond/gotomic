@@ -40,7 +40,7 @@ func (self *nodeRef) push(c Comparable) {
 func (self *nodeRef) clean() {
 	current := self.node()
 	next_ok := current
-	for next_ok.deleted {
+	for next_ok != nil && next_ok.deleted {
 		next_ok = next_ok.next.node()
 	}
 	if current != next_ok {
