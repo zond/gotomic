@@ -3,28 +3,25 @@ package gotomic
 import (
 	"fmt"
 	"testing"
+	"runtime"
 )
 
-type s string
-func (self s) Compare(o interface{}) int {
-	return 0
-}
-
-func fiddle(nr *nodeRef, do, done chan bool) {
+func fiddle(n string, nr *nodeRef, do, done chan bool) {
 	<- do
-	for i := 0; i < 1000; i++ {
-		nr.push(s(fmt.Sprint("x", i)))
+	for i := 0; i < 10000; i++ {
+		nr.push(fmt.Sprint(n, i))
 		nr.pop()
 	}
 	done <- true
 }
 
 func TestTest(t *testing.T) {
+	runtime.GOMAXPROCS(4)
 	nr := new(nodeRef)
 	fmt.Println(nr)
-	nr.push(s("hej"))
-	nr.push(s("haj"))
-	nr.push(s("hoj"))
+	nr.push("hej")
+	nr.push("haj")
+	nr.push("hoj")
 	fmt.Println(nr)
 	fmt.Println("popped", nr.pop())
 	fmt.Println(nr)
@@ -32,18 +29,20 @@ func TestTest(t *testing.T) {
 	fmt.Println(nr)
 	fmt.Println("popped", nr.pop())
 	fmt.Println(nr)
-	nr.push(s("1"))
-	nr.push(s("2"))
-	nr.push(s("3"))
-	nr.push(s("4"))
-	nr.push(s("5"))
+	nr.push("1")
+	nr.push("2")
+	nr.push("3")
+	nr.push("4")
+	nr.push("5")
 	fmt.Println(nr)
 	do := make(chan bool)
 	done := make(chan bool)
-	go fiddle(nr, do, done)
-	go fiddle(nr, do, done)
-	go fiddle(nr, do, done)
+	go fiddle("a", nr, do, done)
+	go fiddle("b", nr, do, done)
+	go fiddle("b", nr, do, done)
+	go fiddle("b", nr, do, done)
 	close(do)
+	<-done
 	<-done
 	<-done
 	<-done

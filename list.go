@@ -6,12 +6,10 @@ import (
 	"unsafe"
 )
 
-type Comparable interface {
-	Compare(a interface{}) int
-}
+type thing interface{}
 
 type node struct {
-	value Comparable
+	value thing
 	next *nodeRef
 	deleted bool
 }
@@ -27,18 +25,7 @@ type nodeRef struct {
 	unsafe.Pointer
 }
 func (self *nodeRef) node() *node {
-	return (*node)(atomic.LoadPointer(&self.Pointer))
-}
-func (self *nodeRef) push(c Comparable) {
-	old_node := self.node()
-	new_node := &node{c, &nodeRef{unsafe.Pointer(old_node)}, false}
-	for !atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(new_node)) {
-		old_node = self.node()
-		new_node.next.Pointer = unsafe.Pointer(old_node)
-	}
-}
-func (self *nodeRef) clean() {
-	current := self.node()
+	current := (*node)(self.Pointer)
 	next_ok := current
 	for next_ok != nil && next_ok.deleted {
 		next_ok = next_ok.next.node()
@@ -46,8 +33,17 @@ func (self *nodeRef) clean() {
 	if current != next_ok {
 		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(next_ok))
 	}
+	return next_ok
 }
-func (self *nodeRef) pop() Comparable {
+func (self *nodeRef) push(c thing) {
+	old_node := self.node()
+	new_node := &node{c, &nodeRef{unsafe.Pointer(old_node)}, false}
+	for !atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(new_node)) {
+		old_node = self.node()
+		new_node.next.Pointer = unsafe.Pointer(old_node)
+	}
+}
+func (self *nodeRef) pop() thing {
 	old_node := self.node()
 	if old_node == nil {
 		return nil
@@ -61,7 +57,7 @@ func (self *nodeRef) pop() Comparable {
 		deleted_node.value = old_node.value
 		deleted_node.next = old_node.next
 	}
-	self.clean()
+	self.node()
 	return old_node.value
 }
 func (self *nodeRef) String() string {
