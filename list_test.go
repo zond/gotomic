@@ -16,4 +16,7 @@ func TestTest(t *testing.T) {
 	nr.push(s("haj"))
 	nr.push(s("hoj"))
 	fmt.Println(nr)
+	fmt.Println("popped", nr.pop())
+	fmt.Println("popped", nr.pop())
+	fmt.Println(nr)
 }
