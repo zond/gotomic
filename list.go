@@ -6,6 +6,18 @@ import (
 	"unsafe"
 )
 
+type hit struct {
+	leftRef *nodeRef
+	leftNode *node
+	ref *nodeRef
+	node *node
+	rightRef *nodeRef
+	rightNode *node
+}
+func (self *hit) String() string {
+	return fmt.Sprintf("&hit{%p(%v),%p(%v),%p(%v)}", self.leftRef, self.leftNode.val(), self.ref, self.node.val(), self.rightRef, self.rightNode.val())
+}
+
 type Comparable interface {
 	Compare(thing) int
 }
@@ -66,42 +78,42 @@ func (self *nodeRef) push(c thing) {
 }
 func (self *nodeRef) inject(c Comparable) {
 	for {
-		b, m, a := self.search(c)
-		if b == nil {
-			if m == nil {
-				if self.pushBefore(c, a) { break }
-			} else {
-				if self.pushBefore(c, m) { break }
-			}
+		hit := self.search(c)
+		if hit.ref != nil {
+			if hit.ref.pushBefore(c, hit.node) { break }
+		} else if hit.rightRef != nil {
+			if hit.rightRef.pushBefore(c, hit.rightNode) { break }
+		} else if hit.leftRef != nil {
+			if hit.leftRef.pushBefore(c, hit.leftNode) { break }
 		} else {
-			if m == nil {
-				if b.next.pushBefore(c, a) { break }
-			} else {
-				if b.next.pushBefore(c, m) { break }
-			}
+			panic(fmt.Sprintf("Expected some kind of result from %#v.search(%v), but got %+v", self, c, hit))
 		}
 	}
 }
-func (self *nodeRef) search(c Comparable) (before, match, after *node) {
-	before = nil
-	match = self.node()
-	after = nil
+func (self *nodeRef) search(c Comparable) (rval *hit) {
+	rval = &hit{nil, nil, self, self.node(), nil, nil}
 	for {
-		if match == nil {
+		if rval.node == nil {
 			return
 		}
-		after = match.next.node()
-		switch cmp := c.Compare(match.value); {
+		rval.rightRef = rval.node.next
+		rval.rightNode = rval.rightRef.node()
+		switch cmp := c.Compare(rval.node.value); {
 		case cmp < 0:
-			after = match
-			match = nil
+			rval.rightRef = rval.ref
+			rval.rightNode = rval.node
+			rval.ref = nil
+			rval.node = nil
 			return
 		case cmp == 0:
 			return
 		}
-		before = match
-		match = match.next.node()
-		after = nil
+		rval.leftRef = rval.ref
+		rval.leftNode = rval.leftRef.node()
+		rval.ref = rval.leftNode.next
+		rval.node = rval.ref.node()
+		rval.rightRef = nil
+		rval.rightNode = nil
 	}
 	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
 }

@@ -8,7 +8,7 @@ import (
 type key string
 func (self key) HashCode() uint32 {
 	var sum uint32
-	for c := range self {
+	for _, c := range string(self) {
 		sum += uint32(c)
 	}
 	return sum

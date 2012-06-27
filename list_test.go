@@ -125,12 +125,12 @@ func (self c) Compare(t thing) int {
 
 const ANY = "ANY VALUE"
 
-func searchTest(t *testing.T, nr *nodeRef, s c, wb,wm,wa thing) {
-	b, m, a := nr.search(s)
-	if (wb != ANY && !reflect.DeepEqual(b.val(), wb)) || 
-		(wm != ANY && !reflect.DeepEqual(m.val(), wm)) || 
-		(wa != ANY && !reflect.DeepEqual(a.val(), wa)) {
-		t.Error(nr, ".search(", s, ") should produce ", wb, wm, wa, " but produced ", b.val(), m.val(), a.val())
+func searchTest(t *testing.T, nr *nodeRef, s c, l, n, r thing) {
+	h := nr.search(s)
+	if (l != ANY && !reflect.DeepEqual(h.leftNode.val(), l)) || 
+		(n != ANY && !reflect.DeepEqual(h.node.val(), n)) || 
+		(r != ANY && !reflect.DeepEqual(h.rightNode.val(), r)) {
+		t.Error(nr, ".search(", s, ") should produce ", r, n, l, " but produced ", h.leftNode.val(), h.node.val(), h.rightNode.val())
 	}
 }
 

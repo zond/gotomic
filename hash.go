@@ -70,16 +70,22 @@ func newHash() *hash {
 func (self *hash) describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	for i := 0; i < (1 << self.exponent); i++ {
-		bucket := self.getBucketByHashCode(uint32(i))
-		node := bucket.node()
+		self.getBucketByHashCode(uint32(i))
+	}
+	bucket := self.getBucketByHashCode(0)
+	node := bucket.node()
+	for node != nil {
 		e := node.value.(*entry)
-		fmt.Fprintf(buffer, "%0.32b/%0.32b\n", e.hashCode, e.hashKey)
-		for node != nil {
-			if e = node.value.(*entry); e.real() {
-				fmt.Fprintf(buffer, "\t%v\n", e)
+		if e.real() {
+			fmt.Fprintln(buffer, "\t", e)
+		} else {
+			if self.getBucketByHashCode(e.hashCode) != bucket {
+				fmt.Printf("%v with hashCode %v should get %#v as bucket, but got %#v\n", e, e.hashCode, self.getBucketByHashCode(e.hashCode), bucket)
 			}
-			node = node.next.node()
+			fmt.Fprintln(buffer, e)
 		}
+		bucket = node.next
+		node = bucket.node()
 	}
 	return string(buffer.Bytes())
 }
@@ -103,14 +109,14 @@ func (self *hash) put(k Hashable, v thing) (rval thing) {
 	newEntry := newRealEntry(k, v)
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
-		if before, match, after := bucket.search(newEntry); match == nil {
-			if before.next.pushBefore(newEntry, after) {
+		if hit := bucket.search(newEntry); hit.node == nil {
+			if hit.leftRef.pushBefore(newEntry, hit.leftNode) {
 				self.addSize(1)
 				rval = nil
 				break
 			}
 		} else {
-			oldEntry := match.value.(*entry)
+			oldEntry := hit.node.value.(*entry)
 			rval = *(*thing)(atomic.LoadPointer(&oldEntry.value))
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
 			break
@@ -149,6 +155,7 @@ func (self *hash) getBucketIndices(index uint32) (superIndex, subIndex uint32) {
 }
 func (self *hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 	superIndex, subIndex := self.getBucketIndices(index)
+	fmt.Println("superIndex, subIndex for ", index, " = ", superIndex, subIndex)
 	subBuckets := *(*[]unsafe.Pointer)(self.buckets[superIndex])
 	for {
 		bucket = (*nodeRef)(subBuckets[subIndex])
@@ -163,12 +170,13 @@ func (self *hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 		} else {
 			prev := self.getPreviousBucketIndex(mockEntry.hashKey)
 			previousBucket := self.getBucketByIndex(prev)
-			if before, match, after := previousBucket.search(mockEntry); match == nil {
-				before.next.pushBefore(mockEntry, after)
+			if hit := previousBucket.search(mockEntry); hit.node == nil {
+				hit.rightRef.pushBefore(mockEntry, hit.rightNode)
 			} else {
-				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(before.next))
+				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.ref))
 			}
 		}
 	}
+	fmt.Printf("and it returns %#v\n", bucket)
 	return bucket
 }
