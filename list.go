@@ -6,12 +6,22 @@ import (
 	"unsafe"
 )
 
+type Comparable interface {
+	Compare(thing) int
+}
+
 type thing interface{}
 
 type node struct {
 	value thing
 	next *nodeRef
 	deleted bool
+}
+func (self *node) val() thing {
+	if self == nil {
+		return nil
+	}
+	return self.value
 }
 func (self *node) String() string {
 	deleted := ""
@@ -51,6 +61,29 @@ func (self *nodeRef) push(c thing) {
 		old_node = self.node()
 		new_node.next.Pointer = unsafe.Pointer(old_node)
 	}
+}
+func (self *nodeRef) search(c Comparable) (before, match, after *node) {
+	before = nil
+	match = self.node()
+	after = nil
+	for {
+		if match == nil {
+			return
+		}
+		after = match.next.node()
+		switch cmp := c.Compare(match.value); {
+		case cmp < 0:
+			after = match
+			match = nil
+			return
+		case cmp == 0:
+			return
+		}
+		before = match
+		match = match.next.node()
+		after = nil
+	}
+	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
 }
 func (self *nodeRef) pop() thing {
 	old_node := self.node()

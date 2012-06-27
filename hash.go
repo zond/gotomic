@@ -4,6 +4,7 @@ package gotomic
 import (
 	"sync/atomic"
 	"unsafe"
+	"fmt"
 )
 
 const MAX_EXPONENT = 32
@@ -21,6 +22,18 @@ type entry struct {
 }
 func newMockEntry(hashCode uint32) *entry {
 	return &entry{hashCode, reverse(hashCode) &^ 1, nil, nil}
+}
+func (self *entry) Compare(t thing) int {
+	if e, ok := t.(*entry); ok {
+		if self.hashKey > e.hashKey {
+			return 1
+		} else if self.hashKey < e.hashKey {
+			return -1
+		} else {
+			return 0
+		}
+	}
+	panic(fmt.Sprint(self, " can only compare itself against other *entry, not against ", t))
 }
 
 
@@ -73,7 +86,11 @@ func (self *hash) getBucketByIndex(index uint32) *nodeRef {
 			atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(bucket))
 		} else {
 			previousBucket := self.getBucketByIndex(self.getPreviousBucketIndex(mockEntry.hashKey))
-			
+			_, match, _ := previousBucket.search(mockEntry)
+			if match == nil {
+			} else {
+				
+			}
 		}
 	}
 	return bucket

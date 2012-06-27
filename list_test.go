@@ -71,3 +71,65 @@ func TestPushPop(t *testing.T) {
 	assertSlicey(t, nr, []thing{"4","3","2","1"})
 }
 
+type c string
+func (self c) Compare(t thing) int {
+	if s, ok := t.(string); ok {
+		if self[0] > s[0] {
+			return 1
+		} else if self[0] < s[0] {
+			return -1
+		}
+	}
+	return 0
+}
+
+const ANY = "ANY VALUE"
+
+func searchTest(t *testing.T, nr *nodeRef, s c, wb,wm,wa thing) {
+	b, m, a := nr.search(s)
+	if (wb != ANY && !reflect.DeepEqual(b.val(), wb)) || 
+		(wm != ANY && !reflect.DeepEqual(m.val(), wm)) || 
+		(wa != ANY && !reflect.DeepEqual(a.val(), wa)) {
+		t.Error(nr, ".search(", s, ") should produce ", wb, wm, wa, " but produced ", b.val(), m.val(), a.val())
+	}
+}
+
+func TestSearch(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	nr := new(nodeRef)
+	nr.push("h")
+	nr.push("g")
+	nr.push("f")
+	nr.push("d")
+	nr.push("c")
+	nr.push("b")
+	searchTest(t, nr, "a", nil, nil, "b")
+	searchTest(t, nr, "b", nil, "b", "c")
+	searchTest(t, nr, "c", "b", "c", "d")
+	searchTest(t, nr, "d", "c", "d", "f")
+	searchTest(t, nr, "e", "d", nil, "f")
+	searchTest(t, nr, "f", "d", "f", "g")
+	searchTest(t, nr, "g", "f", "g", "h")
+	searchTest(t, nr, "h", "g", "h", nil)
+	searchTest(t, nr, "i", "h", nil, nil)
+	do := make(chan bool)
+	done := make(chan bool)
+	go fiddle("a1", nr, do, done)
+	go fiddle("a2", nr, do, done)
+	go fiddle("a3", nr, do, done)
+	go fiddle("a4", nr, do, done)
+	close(do)
+	searchTest(t, nr, "a", ANY, nil, "b")
+	searchTest(t, nr, "b", ANY, "b", "c")
+	searchTest(t, nr, "c", "b", "c", "d")
+	searchTest(t, nr, "d", "c", "d", "f")
+	searchTest(t, nr, "e", "d", nil, "f")
+	searchTest(t, nr, "f", "d", "f", "g")
+	searchTest(t, nr, "g", "f", "g", "h")
+	searchTest(t, nr, "h", "g", "h", nil)
+	searchTest(t, nr, "i", "h", nil, nil)
+	<-done
+	<-done
+	<-done
+	<-done
+}
