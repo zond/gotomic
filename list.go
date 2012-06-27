@@ -59,7 +59,7 @@ func (self *nodeRef) pushBefore(t thing, n *node) bool {
 		return false
 	}
 	new_node := &node{t, &nodeRef{unsafe.Pointer(n)}, false}
-	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(n), unsafe.Pointer(new_node))
+	return atomic.CompareAndSwapPointer(&self.Pointer, new_node.next.Pointer, unsafe.Pointer(new_node))
 }
 func (self *nodeRef) push(c thing) {
 	for !self.pushBefore(c, self.node()) {}

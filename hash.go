@@ -39,7 +39,7 @@ func (self *entry) val() thing {
 	return *(*thing)(self.value)
 }
 func (self *entry) String() string {
-	return fmt.Sprintf("&entry{%b/%b, %v=>%v}", self.hashCode, self.hashKey, self.key, self.val())
+	return fmt.Sprintf("&entry{%0.32b/%0.32b, %v=>%v}", self.hashCode, self.hashKey, self.key, self.val())
 }
 func (self *entry) Compare(t thing) int {
 	if e, ok := t.(*entry); ok {
@@ -66,6 +66,15 @@ func newHash() *hash {
 	b := make([]unsafe.Pointer, 1)
 	rval.buckets[0] = unsafe.Pointer(&b)
 	return rval
+}
+func (self *hash) describe() string {
+	buffer := bytes.NewBufferString(fmt.Sprintf("&hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
+	for i := 0; i < (1 << self.exponent); i++ {
+		bucket := self.getBucketByHashCode(uint32(i))
+		e := bucket.node().value.(*entry)
+		fmt.Fprintf(buffer, "%0.32b/%0.32b\n\t%v\n", e.hashCode, e.hashKey, bucket.node().next)
+	}
+	return string(buffer.Bytes())
 }
 func (self *hash) String() string {
 	buffer := bytes.NewBufferString("{")
@@ -145,11 +154,12 @@ func (self *hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 			bucket.push(mockEntry)
 			atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(bucket))
 		} else {
-			previousBucket := self.getBucketByIndex(self.getPreviousBucketIndex(mockEntry.hashKey))
+			prev := self.getPreviousBucketIndex(mockEntry.hashKey)
+			previousBucket := self.getBucketByIndex(prev)
 			if before, match, after := previousBucket.search(mockEntry); match == nil {
 				before.next.pushBefore(mockEntry, after)
 			} else {
-				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(match))
+				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(before.next))
 			}
 		}
 	}

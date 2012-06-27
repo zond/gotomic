@@ -22,8 +22,8 @@ func (self key) Equals(t thing) bool {
 
 func TestPutGet(t *testing.T) {
 	h := newHash()
-	fmt.Println(h)
+	fmt.Println(h.describe())
 	h.put(key("a"), "b")
-	fmt.Println(h)
+	fmt.Println(h.describe())
 }
 
