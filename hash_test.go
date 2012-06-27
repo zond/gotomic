@@ -25,5 +25,9 @@ func TestPutGet(t *testing.T) {
 	fmt.Println(h.describe())
 	h.put(key("a"), "b")
 	fmt.Println(h.describe())
+	h.put(key("a"), "b")
+	fmt.Println(h.describe())
+	h.put(key("c"), "d")
+	fmt.Println(h.describe())
 }
 

@@ -71,8 +71,15 @@ func (self *hash) describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	for i := 0; i < (1 << self.exponent); i++ {
 		bucket := self.getBucketByHashCode(uint32(i))
-		e := bucket.node().value.(*entry)
-		fmt.Fprintf(buffer, "%0.32b/%0.32b\n\t%v\n", e.hashCode, e.hashKey, bucket.node().next)
+		node := bucket.node()
+		e := node.value.(*entry)
+		fmt.Fprintf(buffer, "%0.32b/%0.32b\n", e.hashCode, e.hashKey)
+		for node != nil {
+			if e = node.value.(*entry); e.real() {
+				fmt.Fprintf(buffer, "\t%v\n", e)
+			}
+			node = node.next.node()
+		}
 	}
 	return string(buffer.Bytes())
 }
