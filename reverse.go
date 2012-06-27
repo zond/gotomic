@@ -14,5 +14,6 @@ func reverse(v uint32) uint32 {
 	// swap bytes
 	v = ((v >> 8) & 0x00FF00FF) | ((v & 0x00FF00FF) << 8);
 	// swap 2-byte long pairs
-	return ( v >> 16          ) | ( v               << 16);    
+	v = ( v >> 16             ) | ( v               << 16);
+	return v
 }    

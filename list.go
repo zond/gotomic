@@ -28,7 +28,7 @@ func (self *node) String() string {
 	if self.deleted {
 		deleted = " (x)"
 	}
-	return fmt.Sprintf("%#v%v -> %v", self.value, deleted, self.next)
+	return fmt.Sprintf("%v%v -> %v", self.value, deleted, self.next)
 }
 
 type nodeRef struct {
