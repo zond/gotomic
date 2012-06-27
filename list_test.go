@@ -1,18 +1,23 @@
 package gotomic
 
 import (
-	"fmt"
 	"testing"
 	"reflect"
 	"runtime"
 	"math/rand"
+	"time"
+	"math"
 )
 
-func fiddle(n string, nr *nodeRef, do, done chan bool) {
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func fiddle(nr *nodeRef, do, done chan bool) {
 	<- do
 	num := 10000
 	for i := 0; i < num; i++ {
-		nr.push(fmt.Sprint(n, rand.Int()))
+		nr.push(rand.Int())
 	}
 	for i := 0; i < num; i++ {
 		nr.pop()
@@ -24,7 +29,7 @@ func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
 	<- do
 	num := 1000
 	for i := 0; i < num; i++ {
-		nr.inject(c(rand.Int()))
+		nr.inject(c(-int(math.Abs(float64(rand.Int())))))
 		stuff := nr.toSlice()
 		var last Comparable
 		for _, item := range stuff {
@@ -87,10 +92,10 @@ func TestPushPop(t *testing.T) {
 	nr.push("4")
 	do := make(chan bool)
 	done := make(chan bool)
-	go fiddle("a", nr, do, done)
-	go fiddle("b", nr, do, done)
-	go fiddle("b", nr, do, done)
-	go fiddle("b", nr, do, done)
+	go fiddle(nr, do, done)
+	go fiddle(nr, do, done)
+	go fiddle(nr, do, done)
+	go fiddle(nr, do, done)
 	close(do)
 	<-done
 	<-done
@@ -146,15 +151,27 @@ func TestPushBefore(t *testing.T) {
 	}
 }
 
-func TestInject(t *testing.T) {
+func TestInjectAndSearch(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(nodeRef)
-	nr.inject(c(5))
-	nr.inject(c(1))
 	nr.inject(c(3))
-	nr.inject(c(8))
+	nr.inject(c(5))
+	nr.inject(c(9))
+	nr.inject(c(7))
 	nr.inject(c(4))
-	assertSlicey(t, nr, []thing{c(1),c(3),c(4),c(5),c(8)})
+	nr.inject(c(8))
+	assertSlicey(t, nr, []thing{c(3),c(4),c(5),c(7),c(8),c(9)})
+	searchTest(t, nr, c(1), nil, nil, c(3))
+	searchTest(t, nr, c(2), nil, nil, c(3))
+	searchTest(t, nr, c(3), nil, c(3), c(4))
+	searchTest(t, nr, c(4), c(3), c(4), c(5))
+	searchTest(t, nr, c(5), c(4), c(5), c(7))
+	searchTest(t, nr, c(6), c(5), nil, c(7))
+	searchTest(t, nr, c(7), c(5), c(7), c(8))
+	searchTest(t, nr, c(8), c(7), c(8), c(9))
+	searchTest(t, nr, c(9), c(8), c(9), nil)
+	searchTest(t, nr, c(10), c(9), nil, nil)
+	searchTest(t, nr, c(11), c(9), nil, nil)
 	do := make(chan bool)
 	done := make(chan bool)
 	go fiddleAndAssertSort(t, nr, do, done)
@@ -162,48 +179,19 @@ func TestInject(t *testing.T) {
 	go fiddleAndAssertSort(t, nr, do, done)
 	go fiddleAndAssertSort(t, nr, do, done)
 	close(do)
-	<-done
-	<-done
-	<-done
-	<-done
-}
-
-func TestSearch(t *testing.T) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(nodeRef)
-	nr.push(8)
-	nr.push(7)
-	nr.push(6)
-	nr.push(4)
-	nr.push(3)
-	nr.push(2)
-	searchTest(t, nr, c(1), nil, nil, 2)
-	searchTest(t, nr, c(2), nil, 2, 3)
-	searchTest(t, nr, c(3), 2, 3, 4)
-	searchTest(t, nr, c(4), 3, 4, 6)
-	searchTest(t, nr, c(5), 4, nil, 6)
-	searchTest(t, nr, c(6), 4, 6, 7)
-	searchTest(t, nr, c(7), 6, 7, 8)
-	searchTest(t, nr, c(8), 7, 8, nil)
-	searchTest(t, nr, c(9), 8, nil, nil)
-	do := make(chan bool)
-	done := make(chan bool)
-	go fiddle("a1", nr, do, done)
-	go fiddle("a2", nr, do, done)
-	go fiddle("a3", nr, do, done)
-	go fiddle("a4", nr, do, done)
-	close(do)
-	searchTest(t, nr, c(1), ANY, nil, 2)
-	searchTest(t, nr, c(2), ANY, 2, 3)
-	searchTest(t, nr, c(3), 2, 3, 4)
-	searchTest(t, nr, c(4), 3, 4, 6)
-	searchTest(t, nr, c(5), 4, nil, 6)
-	searchTest(t, nr, c(6), 4, 6, 7)
-	searchTest(t, nr, c(7), 6, 7, 8)
-	searchTest(t, nr, c(8), 7, 8, nil)
-	searchTest(t, nr, c(9), 8, nil, nil)
-	<-done
-	<-done
-	<-done
-	<-done
+	for i := 0; i < 4; i++ {
+		searchTest(t, nr, c(1), ANY, ANY, c(3))
+		searchTest(t, nr, c(2), ANY, ANY, c(3))
+		searchTest(t, nr, c(3), ANY, c(3), c(4))
+		searchTest(t, nr, c(4), c(3), c(4), c(5))
+		searchTest(t, nr, c(5), c(4), c(5), c(7))
+		searchTest(t, nr, c(6), c(5), nil, c(7))
+		searchTest(t, nr, c(7), c(5), c(7), c(8))
+		searchTest(t, nr, c(8), c(7), c(8), c(9))
+		searchTest(t, nr, c(9), c(8), c(9), nil)
+		searchTest(t, nr, c(10), c(9), nil, nil)
+		searchTest(t, nr, c(11), c(9), nil, nil)
+		<-done
+	}
+	assertSlicey(t, nr, []thing{c(3),c(4),c(5),c(7),c(8),c(9)})
 }
