@@ -5,12 +5,40 @@ import (
 	"testing"
 	"reflect"
 	"runtime"
+	"math/rand"
 )
 
 func fiddle(n string, nr *nodeRef, do, done chan bool) {
 	<- do
-	for i := 0; i < 10000; i++ {
-		nr.push(fmt.Sprint(n, i))
+	num := 10000
+	for i := 0; i < num; i++ {
+		nr.push(fmt.Sprint(n, rand.Int()))
+	}
+	for i := 0; i < num; i++ {
+		nr.pop()
+	}
+	done <- true
+}
+
+func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
+	<- do
+	num := 1000
+	for i := 0; i < num; i++ {
+		nr.inject(c(rand.Int()))
+		stuff := nr.toSlice()
+		var last Comparable
+		for _, item := range stuff {
+			if s, ok := item.(Comparable); ok {
+				if s.Compare(last) < 0 {
+					t.Error(nr, " should be sorted, but ", s, " should really be before ", last)
+				}
+				last = s
+			} else {
+				t.Error(nr, " should contain only Comparable items, but found ", item)
+			}
+		}
+	}
+	for i := 0; i < num; i++ {
 		nr.pop()
 	}
 	done <- true
@@ -71,19 +99,19 @@ func TestPushPop(t *testing.T) {
 	assertSlicey(t, nr, []thing{"4","3","2","1"})
 }
 
-type c string
+type c int
 func (self c) Compare(t thing) int {
-	if s, ok := t.(string); ok {
-		if self[0] > s[0] {
+	if s, ok := t.(int); ok {
+		if int(self) > s {
 			return 1
-		} else if self[0] < s[0] {
+		} else if int(self) < s {
 			return -1
 		}
 	}
 	if s, ok := t.(c); ok {
-		if self[0] > s[0] {
+		if self > s {
 			return 1
-		} else if self[0] < s[0] {
+		} else if self < s {
 			return -1
 		}
 	}
@@ -121,32 +149,43 @@ func TestPushBefore(t *testing.T) {
 func TestInject(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(nodeRef)
-	nr.inject(c("h"))
-	nr.inject(c("a"))
-	nr.inject(c("b"))
-	nr.inject(c("x"))
-	nr.inject(c("d"))
-	assertSlicey(t, nr, []thing{c("a"),c("b"),c("d"),c("h"),c("x")})
+	nr.inject(c(5))
+	nr.inject(c(1))
+	nr.inject(c(3))
+	nr.inject(c(8))
+	nr.inject(c(4))
+	assertSlicey(t, nr, []thing{c(1),c(3),c(4),c(5),c(8)})
+	do := make(chan bool)
+	done := make(chan bool)
+	go fiddleAndAssertSort(t, nr, do, done)
+	go fiddleAndAssertSort(t, nr, do, done)
+	go fiddleAndAssertSort(t, nr, do, done)
+	go fiddleAndAssertSort(t, nr, do, done)
+	close(do)
+	<-done
+	<-done
+	<-done
+	<-done
 }
 
 func TestSearch(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(nodeRef)
-	nr.push("h")
-	nr.push("g")
-	nr.push("f")
-	nr.push("d")
-	nr.push("c")
-	nr.push("b")
-	searchTest(t, nr, "a", nil, nil, "b")
-	searchTest(t, nr, "b", nil, "b", "c")
-	searchTest(t, nr, "c", "b", "c", "d")
-	searchTest(t, nr, "d", "c", "d", "f")
-	searchTest(t, nr, "e", "d", nil, "f")
-	searchTest(t, nr, "f", "d", "f", "g")
-	searchTest(t, nr, "g", "f", "g", "h")
-	searchTest(t, nr, "h", "g", "h", nil)
-	searchTest(t, nr, "i", "h", nil, nil)
+	nr.push(8)
+	nr.push(7)
+	nr.push(6)
+	nr.push(4)
+	nr.push(3)
+	nr.push(2)
+	searchTest(t, nr, c(1), nil, nil, 2)
+	searchTest(t, nr, c(2), nil, 2, 3)
+	searchTest(t, nr, c(3), 2, 3, 4)
+	searchTest(t, nr, c(4), 3, 4, 6)
+	searchTest(t, nr, c(5), 4, nil, 6)
+	searchTest(t, nr, c(6), 4, 6, 7)
+	searchTest(t, nr, c(7), 6, 7, 8)
+	searchTest(t, nr, c(8), 7, 8, nil)
+	searchTest(t, nr, c(9), 8, nil, nil)
 	do := make(chan bool)
 	done := make(chan bool)
 	go fiddle("a1", nr, do, done)
@@ -154,15 +193,15 @@ func TestSearch(t *testing.T) {
 	go fiddle("a3", nr, do, done)
 	go fiddle("a4", nr, do, done)
 	close(do)
-	searchTest(t, nr, "a", ANY, nil, "b")
-	searchTest(t, nr, "b", ANY, "b", "c")
-	searchTest(t, nr, "c", "b", "c", "d")
-	searchTest(t, nr, "d", "c", "d", "f")
-	searchTest(t, nr, "e", "d", nil, "f")
-	searchTest(t, nr, "f", "d", "f", "g")
-	searchTest(t, nr, "g", "f", "g", "h")
-	searchTest(t, nr, "h", "g", "h", nil)
-	searchTest(t, nr, "i", "h", nil, nil)
+	searchTest(t, nr, c(1), ANY, nil, 2)
+	searchTest(t, nr, c(2), ANY, 2, 3)
+	searchTest(t, nr, c(3), 2, 3, 4)
+	searchTest(t, nr, c(4), 3, 4, 6)
+	searchTest(t, nr, c(5), 4, nil, 6)
+	searchTest(t, nr, c(6), 4, 6, 7)
+	searchTest(t, nr, c(7), 6, 7, 8)
+	searchTest(t, nr, c(8), 7, 8, nil)
+	searchTest(t, nr, c(9), 8, nil, nil)
 	<-done
 	<-done
 	<-done
