@@ -54,12 +54,32 @@ func (self *nodeRef) toSlice() []thing {
 	}
 	return rval
 }
+func (self *nodeRef) pushBefore(t thing, n *node) bool {
+	if self.node() != n {
+		return false
+	}
+	new_node := &node{t, &nodeRef{unsafe.Pointer(n)}, false}
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(n), unsafe.Pointer(new_node))
+}
 func (self *nodeRef) push(c thing) {
-	old_node := self.node()
-	new_node := &node{c, &nodeRef{unsafe.Pointer(old_node)}, false}
-	for !atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(new_node)) {
-		old_node = self.node()
-		new_node.next.Pointer = unsafe.Pointer(old_node)
+	for !self.pushBefore(c, self.node()) {}
+}
+func (self *nodeRef) inject(c Comparable) {
+	for {
+		b, m, a := self.search(c)
+		if b == nil {
+			if m == nil {
+				if self.pushBefore(c, a) { break }
+			} else {
+				if self.pushBefore(c, m) { break }
+			}
+		} else {
+			if m == nil {
+				if b.next.pushBefore(c, a) { break }
+			} else {
+				if b.next.pushBefore(c, m) { break }
+			}
+		}
 	}
 }
 func (self *nodeRef) search(c Comparable) (before, match, after *node) {

@@ -80,6 +80,13 @@ func (self c) Compare(t thing) int {
 			return -1
 		}
 	}
+	if s, ok := t.(c); ok {
+		if self[0] > s[0] {
+			return 1
+		} else if self[0] < s[0] {
+			return -1
+		}
+	}
 	return 0
 }
 
@@ -92,6 +99,34 @@ func searchTest(t *testing.T, nr *nodeRef, s c, wb,wm,wa thing) {
 		(wa != ANY && !reflect.DeepEqual(a.val(), wa)) {
 		t.Error(nr, ".search(", s, ") should produce ", wb, wm, wa, " but produced ", b.val(), m.val(), a.val())
 	}
+}
+
+func TestPushBefore(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	nr := new(nodeRef)
+	nr.push("h")
+	nr.push("g")
+	nr.push("f")
+	nr.push("d")
+	nr.push("c")
+	nr.push("b")
+	if nr.pushBefore("a", nr.node().next.node()) {
+		t.Error("should not be possible")
+	}
+	if !nr.pushBefore("a", nr.node()) {
+		t.Error("should be possible")
+	}
+}
+
+func TestInject(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	nr := new(nodeRef)
+	nr.inject(c("h"))
+	nr.inject(c("a"))
+	nr.inject(c("b"))
+	nr.inject(c("x"))
+	nr.inject(c("d"))
+	assertSlicey(t, nr, []thing{c("a"),c("b"),c("d"),c("h"),c("x")})
 }
 
 func TestSearch(t *testing.T) {
