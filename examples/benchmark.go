@@ -37,7 +37,7 @@ func main() {
 		cmp[k] = i
 	}
 	for k, v := range cmp {
-		if hv := h.Get(k); hv != v {
+		if hv, _ := h.Get(k); hv != v {
 			fmt.Println("bad value in hash, expected ", v, " but got ", hv)
 		}
 	}
