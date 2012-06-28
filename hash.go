@@ -104,12 +104,37 @@ func (self *hash) describe() string {
 func (self *hash) String() string {
 	return fmt.Sprint(self.toMap())
 }
+type hashHit hit
+func (self *hashHit) search(cmp *entry) (node *node) {
+	node = self.node
+	for {
+		if node == nil {
+			break
+		}
+		e := node.value.(*entry)
+		if !e.real() {
+			node = nil
+			break
+		}
+		if e.hashCode != cmp.hashCode {
+			node = nil
+			break
+		}
+		if cmp.key.Equals(e.key) {
+			break
+		}
+		node = node.next.node()
+	}
+	return
+}
 func (self *hash) put(k Hashable, v thing) (rval thing) {
 	newEntry := newRealEntry(k, v)
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
-		if hit := bucket.search(newEntry); hit.node == nil {
-			if hit.leftRef.pushBefore(newEntry, hit.leftNode) {
+		hit := (*hashHit)(bucket.search(newEntry))
+		if node := hit.search(newEntry); node == nil {
+			fmt.Printf("going to push %v before %v in %#v\n", newEntry, hit.leftNode, hit.leftRef)
+			if hit.leftNode.next.pushBefore(newEntry, hit.rightNode) {
 				self.addSize(1)
 				rval = nil
 				break

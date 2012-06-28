@@ -3,6 +3,7 @@ package gotomic
 import (
 	"testing"
 	"reflect"
+	"fmt"
 )
 
 type key string
@@ -35,5 +36,6 @@ func TestPutGet(t *testing.T) {
 	assertMappy(t, h, map[Hashable]thing{key("a"): "b"})
 	h.put(key("c"), "d")
 	assertMappy(t, h, map[Hashable]thing{key("a"): "b", key("c"): "d"})
+	fmt.Println(h.describe())
 }
 
