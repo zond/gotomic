@@ -13,14 +13,14 @@ func (self key) HashCode() uint32 {
 	}
 	return sum
 }
-func (self key) Equals(t thing) bool {
+func (self key) Equals(t Thing) bool {
 	if s, ok := t.(key); ok {
 		return s == self
 	}
 	return false
 }
 
-func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]thing) {
+func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
 	if e := h.Verify(); e != nil {
 		t.Errorf("%v should be valid, got %v", e)
 	}
@@ -39,12 +39,12 @@ func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]thing) {
 
 func TestPutGet(t *testing.T) {
 	h := NewHash()
-	assertMappy(t, h, map[Hashable]thing{})
+	assertMappy(t, h, map[Hashable]Thing{})
 	h.Put(key("a"), "b")
-	assertMappy(t, h, map[Hashable]thing{key("a"): "b"})
+	assertMappy(t, h, map[Hashable]Thing{key("a"): "b"})
 	h.Put(key("a"), "b")
-	assertMappy(t, h, map[Hashable]thing{key("a"): "b"})
+	assertMappy(t, h, map[Hashable]Thing{key("a"): "b"})
 	h.Put(key("c"), "d")
-	assertMappy(t, h, map[Hashable]thing{key("a"): "b", key("c"): "d"})
+	assertMappy(t, h, map[Hashable]Thing{key("a"): "b", key("c"): "d"})
 }
 

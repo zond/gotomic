@@ -36,7 +36,7 @@ func (self *hashHit) search(cmp *entry) (node *node) {
 }
 
 type Hashable interface {
-	Equals(thing) bool
+	Equals(Thing) bool
 	HashCode() uint32
 }
 
@@ -46,7 +46,7 @@ type entry struct {
 	key Hashable
 	value unsafe.Pointer
 }
-func newRealEntry(k Hashable, v thing) *entry {
+func newRealEntry(k Hashable, v Thing) *entry {
 	hc := k.HashCode()
 	return &entry{hc, reverse(hc) | 1, k, unsafe.Pointer(&v)}
 }
@@ -56,16 +56,16 @@ func newMockEntry(hashCode uint32) *entry {
 func (self *entry) real() bool {
 	return self.hashKey & 1 == 1
 }
-func (self *entry) val() thing {
+func (self *entry) val() Thing {
 	if self.value == nil {
 		return nil
 	}
-	return *(*thing)(self.value)
+	return *(*Thing)(self.value)
 }
 func (self *entry) String() string {
 	return fmt.Sprintf("&entry{%0.32b/%0.32b, %v=>%v}", self.hashCode, self.hashKey, self.key, self.val())
 }
-func (self *entry) Compare(t thing) int {
+func (self *entry) Compare(t Thing) int {
 	if e, ok := t.(*entry); ok {
 		if self.hashKey > e.hashKey {
 			return 1
@@ -82,7 +82,7 @@ func (self *entry) Compare(t thing) int {
 type Hash struct {
 	exponent uint32
 	buckets []unsafe.Pointer
-	size uint64
+	size int64
 	loadFactor float64
 }
 func NewHash() *Hash {
@@ -92,7 +92,7 @@ func NewHash() *Hash {
 	return rval
 }
 func (self *Hash) Size() int {
-	return int(atomic.LoadUint64(&self.size))
+	return int(atomic.LoadInt64(&self.size))
 }
 func (self *Hash) Verify() error {
 	bucket := self.getBucketByHashCode(0)
@@ -114,8 +114,8 @@ func (self *Hash) Verify() error {
 	}
 	return nil
 }
-func (self *Hash) ToMap() map[Hashable]thing {
-	rval := make(map[Hashable]thing)
+func (self *Hash) ToMap() map[Hashable]Thing {
+	rval := make(map[Hashable]Thing)
 	bucket := self.getBucketByHashCode(0)
 	node := bucket.node()
 	for node != nil {
@@ -145,7 +145,7 @@ func (self *Hash) Describe() string {
 func (self *Hash) String() string {
 	return fmt.Sprint(self.ToMap())
 }
-func (self *Hash) Get(k Hashable) (rval thing) {
+func (self *Hash) Get(k Hashable) (rval Thing) {
 	testEntry := newRealEntry(k, nil)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
@@ -154,7 +154,7 @@ func (self *Hash) Get(k Hashable) (rval thing) {
 	}
 	return nil
 }
-func (self *Hash) Put(k Hashable, v thing) (rval thing) {
+func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 	newEntry := newRealEntry(k, v)
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
@@ -167,7 +167,7 @@ func (self *Hash) Put(k Hashable, v thing) (rval thing) {
 			}
 		} else {
 			oldEntry := hit.node.value.(*entry)
-			rval = *(*thing)(atomic.LoadPointer(&oldEntry.value))
+			rval = *(*Thing)(atomic.LoadPointer(&oldEntry.value))
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
 			break
 		}
@@ -175,8 +175,8 @@ func (self *Hash) Put(k Hashable, v thing) (rval thing) {
 	return
 }
 func (self *Hash) addSize(i int) {
-	atomic.AddUint64(&self.size, uint64(i))
-	if atomic.LoadUint64(&self.size) > uint64(self.loadFactor * float64(uint32(1) << self.exponent)) {
+	atomic.AddInt64(&self.size, int64(i))
+	if atomic.LoadInt64(&self.size) > int64(self.loadFactor * float64(uint32(1) << self.exponent)) {
 		self.grow()
 	}
 }

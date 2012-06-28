@@ -20,17 +20,17 @@ func (self *hit) String() string {
 }
 
 type Comparable interface {
-	Compare(thing) int
+	Compare(Thing) int
 }
 
-type thing interface{}
+type Thing interface{}
 
 type node struct {
-	value thing
+	value Thing
 	next *nodeRef
 	deleted bool
 }
-func (self *node) val() thing {
+func (self *node) val() Thing {
 	if self == nil {
 		return nil
 	}
@@ -42,6 +42,32 @@ func (self *node) String() string {
 		deleted = " (x)"
 	}
 	return fmt.Sprintf("%v%v -> %v", self.value, deleted, self.next)
+}
+
+type List struct {
+	*nodeRef
+	size int64
+}
+func NewList() *List {
+	return &List{new(nodeRef), 0}
+}
+func (self *List) Push(t Thing) {
+	self.nodeRef.push(t)
+	atomic.AddInt64(&self.size, 1)
+}
+func (self *List) Pop() Thing {
+	atomic.AddInt64(&self.size, -1)
+	return self.nodeRef.pop()
+}
+func (self *List) Search(c Comparable) Thing {
+	if hit := self.nodeRef.search(c); hit.node != nil {
+		return hit.node.value
+	}
+	return nil
+}
+func (self *List) Inject(c Comparable) {
+	self.nodeRef.inject(c)
+	atomic.AddInt64(&self.size, 1)
 }
 
 type nodeRef struct {
@@ -58,8 +84,8 @@ func (self *nodeRef) node() *node {
 	}
 	return next_ok
 }
-func (self *nodeRef) toSlice() []thing {
-	rval := make([]thing, 0)
+func (self *nodeRef) toSlice() []Thing {
+	rval := make([]Thing, 0)
 	current := self.node()
 	for current != nil {
 		rval = append(rval, current.value)
@@ -67,14 +93,14 @@ func (self *nodeRef) toSlice() []thing {
 	}
 	return rval
 }
-func (self *nodeRef) pushBefore(t thing, n *node) bool {
+func (self *nodeRef) pushBefore(t Thing, n *node) bool {
 	if self.node() != n {
 		return false
 	}
 	new_node := &node{t, &nodeRef{unsafe.Pointer(n)}, false}
 	return atomic.CompareAndSwapPointer(&self.Pointer, new_node.next.Pointer, unsafe.Pointer(new_node))
 }
-func (self *nodeRef) push(c thing) {
+func (self *nodeRef) push(c Thing) {
 	for !self.pushBefore(c, self.node()) {}
 }
 /*
@@ -105,12 +131,12 @@ func (self *nodeRef) verify() error {
 	}
 	last := node.val()
 	node = node.next.node()
-	var bad [][]thing
+	var bad [][]Thing
 	for node != nil {
 		value := node.val()
 		if comp, ok := value.(Comparable); ok {
 			if comp.Compare(last) < 0 {
-				bad = append(bad, []thing{last,value})
+				bad = append(bad, []Thing{last,value})
 			}
 		}
 		last = node.val()
@@ -165,7 +191,7 @@ func (self *nodeRef) search(c Comparable) (rval *hit) {
 	}
 	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
 }
-func (self *nodeRef) pop() thing {
+func (self *nodeRef) pop() Thing {
 	old_node := self.node()
 	if old_node == nil {
 		return nil
