@@ -25,8 +25,16 @@ func assertMappy(t *testing.T, h *hash, cmp map[Hashable]thing) {
 	if e := h.verify(); e != nil {
 		t.Errorf("%v should be valid, got %v", e)
 	}
+	if h.Size() != len(cmp) {
+		t.Errorf("%v should have size %v, but had size %v", h, len(cmp), h.Size())
+	}
 	if tm := h.toMap(); !reflect.DeepEqual(tm, cmp) {
 		t.Errorf("%v should be %#v but is %#v", h, cmp, tm)
+	}
+	for k, v := range cmp {
+		if mv := h.get(k); !reflect.DeepEqual(mv, v) {
+			t.Errorf("%v.get(%v) should produce %v but produced %v", h, k, v, mv)
+		}
 	}
 }
 

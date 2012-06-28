@@ -91,6 +91,9 @@ func newHash() *hash {
 	rval.buckets[0] = unsafe.Pointer(&b)
 	return rval
 }
+func (self *hash) Size() int {
+	return int(atomic.LoadUint64(&self.size))
+}
 func (self *hash) verify() error {
 	bucket := self.getBucketByHashCode(0)
 	if e := bucket.verify(); e != nil {
@@ -141,6 +144,15 @@ func (self *hash) describe() string {
 }
 func (self *hash) String() string {
 	return fmt.Sprint(self.toMap())
+}
+func (self *hash) get(k Hashable) (rval thing) {
+	testEntry := newRealEntry(k, nil)
+	bucket := self.getBucketByHashCode(testEntry.hashCode)
+	hit := (*hashHit)(bucket.search(testEntry))
+	if node := hit.search(testEntry); node != nil {
+		return hit.node.value.(*entry).val()
+	}
+	return nil
 }
 func (self *hash) put(k Hashable, v thing) (rval thing) {
 	newEntry := newRealEntry(k, v)
