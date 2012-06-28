@@ -155,7 +155,6 @@ func (self *hash) getBucketIndices(index uint32) (superIndex, subIndex uint32) {
 }
 func (self *hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 	superIndex, subIndex := self.getBucketIndices(index)
-	fmt.Println("superIndex, subIndex for ", index, " = ", superIndex, subIndex)
 	subBuckets := *(*[]unsafe.Pointer)(self.buckets[superIndex])
 	for {
 		bucket = (*nodeRef)(subBuckets[subIndex])
@@ -177,6 +176,5 @@ func (self *hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 			}
 		}
 	}
-	fmt.Printf("and it returns %#v\n", bucket)
 	return bucket
 }

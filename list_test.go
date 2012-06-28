@@ -151,6 +151,33 @@ func TestPushBefore(t *testing.T) {
 	}
 }
 
+func TestVerify(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	nr := new(nodeRef)
+	nr.inject(c(3))
+	nr.inject(c(5))
+	nr.inject(c(9))
+	nr.inject(c(7))
+	nr.inject(c(4))
+	nr.inject(c(8))
+	assertSlicey(t, nr, []thing{c(3),c(4),c(5),c(7),c(8),c(9)})
+	if err := nr.verify(); err != nil {
+		t.Error(nr, "should verify as ok, got", err)
+	}
+	nr = new(nodeRef)
+	nr.push(c(3))
+	nr.push(c(5))
+	nr.push(c(9))
+	nr.push(c(7))
+	nr.push(c(4))
+	nr.push(c(8))
+	assertSlicey(t, nr, []thing{c(8),c(4),c(7),c(9),c(5),c(3)})
+	s := "8 -> 4 -> 7 -> 9 -> 5 -> 3 -> <nil> is badly ordered. The following nodes are in the wrong order: 8,4; 9,5; 5,3"
+	if err := nr.verify(); err.Error() != s {
+		t.Error(nr, "should have errors", s, "but had", err)
+	}
+}
+
 func TestInjectAndSearch(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(nodeRef)

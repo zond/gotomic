@@ -3,6 +3,7 @@ package gotomic
 import (
 	"fmt" 
 	"sync/atomic"
+	"bytes"
 	"unsafe"
 )
 
@@ -89,6 +90,37 @@ func (self *nodeRef) inject(c Comparable) {
 			panic(fmt.Sprintf("Expected some kind of result from %#v.search(%v), but got %+v", self, c, hit))
 		}
 	}
+}
+func (self *nodeRef) verify() error {
+	node := self.node()
+	if node == nil {
+		return nil
+	}
+	last := node.val()
+	node = node.next.node()
+	var bad [][]thing
+	for node != nil {
+		value := node.val()
+		if comp, ok := value.(Comparable); ok {
+			if comp.Compare(last) < 0 {
+				bad = append(bad, []thing{last,value})
+			}
+		}
+		last = node.val()
+		node = node.next.node()
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	buffer := new(bytes.Buffer)
+	for index, pair := range bad {
+		fmt.Fprint(buffer, pair[0], ",", pair[1])
+		if index < len(bad) - 1 {
+			fmt.Fprint(buffer, "; ")
+		}
+	}
+	return fmt.Errorf("%v is badly ordered. The following nodes are in the wrong order: %v", self, string(buffer.Bytes()));
+	
 }
 func (self *nodeRef) search(c Comparable) (rval *hit) {
 	rval = &hit{nil, nil, self, self.node(), nil, nil}
