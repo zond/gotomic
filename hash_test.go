@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"time"
 )
 
@@ -44,19 +45,107 @@ func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
 	}
 }
 
-func fiddleHash(t *testing.T, h *Hash, s string) {
+func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
+	fmt.Println("a")
+	<- do
+	fmt.Println("b")
 	cmp := make(map[Hashable]Thing)
-	for i := 0; i < 1000; i++ {
+	n := 100
+	fmt.Println("1")
+	for i := 0; i < n; i++ {
 		k := key(fmt.Sprint(s, rand.Int()))
 		v := fmt.Sprint(k, "value")
 		h.Put(k, v)
 		cmp[k] = v
 	}
+	fmt.Println("2")
 	for k, v := range cmp {
 		if hv := h.Get(k); !reflect.DeepEqual(hv, v) {
-			t.Errorf("[%v] should produce %v but produced %v", k, v, hv)
+			t.Errorf("Get(%v) should produce %v but produced %v", k, v, hv)
 		}
 	}
+	fmt.Println("3")
+	for k, v := range cmp {
+		v2 := fmt.Sprint(v, ".2")
+		cmp[k] = v2
+		if hv := h.Put(k, v2); !reflect.DeepEqual(hv, v) {
+			t.Errorf("Get(%v) should produce %v but produced %v", k, v, hv)
+		}
+	}
+	fmt.Println("4")
+	for k, v := range cmp {
+		if hv := h.Get(k); !reflect.DeepEqual(hv, v) {
+			t.Errorf("Get(%v) should produce %v but produced %v", k, v, hv)
+		}
+	}
+	fmt.Println("5")
+	for k, v := range cmp {
+		if hv := h.Delete(k); !reflect.DeepEqual(hv, v) {
+			t.Errorf("Delete(%v) should produce %v but produced %v", k, v, hv)
+		}
+	}
+	fmt.Println("6")
+	for k, v := range cmp {
+		if hv := h.Delete(k); hv != nil {
+			t.Errorf("Delete(%v) should produce nil but produced %v", k, v, hv)
+		}
+	}
+	fmt.Println("7")
+	for k, v := range cmp {
+		if hv := h.Get(k); hv != nil {
+			t.Errorf("Get(%v) should produce nil but produced %v", k, v, hv)
+		}
+	}
+	done <- true
+}
+
+type hashInt int
+func (self hashInt) HashCode() uint32 {
+	return uint32(self)
+}
+func (self hashInt) Equals(t Thing) bool {
+	if i, ok := t.(hashInt); ok {
+		return i == self
+	} 
+	return false
+}
+
+func BenchmarkHash(b *testing.B) {
+	m := NewHash()
+	for i := 0; i < b.N; i++ {
+		k := hashInt(i)
+		m.Put(k, i)
+		j := m.Get(k)
+		if j != i {
+			b.Error("should be same value")
+		}
+	}
+}
+
+func TestConcurrency(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	h := NewHash()
+	fmt.Println("hehu")
+	cmp := make(map[Hashable]Thing)
+	for i := 0; i < 100; i++ {
+		k := key(fmt.Sprint("key", i))
+		v := fmt.Sprint("value", i)
+		h.Put(k, v)
+		cmp[k] = v
+	}
+	fmt.Println("hehasdf")
+	do := make(chan bool)
+	done := make(chan bool)
+	go fiddleHash(t, h, "fiddlerA", do, done)
+	go fiddleHash(t, h, "fiddlerB", do, done)
+	go fiddleHash(t, h, "fiddlerC", do, done)
+	go fiddleHash(t, h, "fiddlerD", do, done)
+	close(do)
+	<- done
+	<- done
+	<- done
+	<- done
+	assertMappy(t, h, cmp)
 }
 
 func TestPutDelete(t *testing.T) {
