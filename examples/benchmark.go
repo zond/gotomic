@@ -26,8 +26,13 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}		
+	f2, err := os.Create("memprofile")
+	if err != nil {
+		panic(err.Error())
+	}		
 	pprof.StartCPUProfile(f)
 	defer pprof.StopCPUProfile()	
+	defer pprof.WriteHeapProfile(f2)
 
 	h := gotomic.NewHash()
 	cmp := make(map[gotomic.Hashable]interface{})

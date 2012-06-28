@@ -161,10 +161,12 @@ func TestPushBefore(t *testing.T) {
 	nr.push("d")
 	nr.push("c")
 	nr.push("b")
-	if nr.pushBefore("a", nr.node().next.node()) {
+	ref := &nodeRef{}
+	node := &node{}
+	if nr.pushBefore("a", ref, node, nr.node().next.node()) {
 		t.Error("should not be possible")
 	}
-	if !nr.pushBefore("a", nr.node()) {
+	if !nr.pushBefore("a", ref, node, nr.node()) {
 		t.Error("should be possible")
 	}
 }

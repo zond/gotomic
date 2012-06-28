@@ -183,11 +183,13 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 }
 func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 	newEntry := newRealEntry(k, v)
+	ref := &nodeRef{}
+	node := &node{}
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
 		if hit2 := hit.search(newEntry); hit2.node == nil {
-			if hit2.leftNode.next.pushBefore(newEntry, hit2.rightNode) {
+			if hit2.leftNode.next.pushBefore(newEntry, ref, node, hit2.rightNode) {
 				self.addSize(1)
 				rval = nil
 				return
@@ -247,7 +249,9 @@ func (self *Hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 			prev := self.getPreviousBucketIndex(mockEntry.hashKey)
 			previousBucket := self.getBucketByIndex(prev)
 			if hit := previousBucket.search(mockEntry); hit.node == nil {
-				hit.leftNode.next.pushBefore(mockEntry, hit.rightNode)
+				ref := &nodeRef{}
+				node := &node{}
+				hit.leftNode.next.pushBefore(mockEntry, ref, node, hit.rightNode)
 			} else {
 				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.ref))
 			}

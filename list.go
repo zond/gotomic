@@ -99,29 +99,36 @@ func (self *nodeRef) ToSlice() []Thing {
 	}
 	return rval
 }
-func (self *nodeRef) pushBefore(t Thing, n *node) bool {
+func (self *nodeRef) pushBefore(t Thing, allocatedRef *nodeRef, allocatedNode, n *node) bool {
 	if self.node() != n {
 		return false
 	}
-	new_node := &node{t, &nodeRef{unsafe.Pointer(n)}, false}
-	return atomic.CompareAndSwapPointer(&self.Pointer, new_node.next.Pointer, unsafe.Pointer(new_node))
+	allocatedRef.Pointer = unsafe.Pointer(n)
+	allocatedNode.value = t
+	allocatedNode.next = allocatedRef
+	allocatedNode.deleted = false
+	return atomic.CompareAndSwapPointer(&self.Pointer, allocatedNode.next.Pointer, unsafe.Pointer(allocatedNode))
 }
 func (self *nodeRef) push(c Thing) {
-	for !self.pushBefore(c, self.node()) {}
+	ref := &nodeRef{}
+	node := &node{}
+	for !self.pushBefore(c, ref, node, self.node()) {}
 }
 /*
  * inject c into self either before the first matching value (c.Compare(value) == 0), before the first value
  * it should be before (c.Compare(value) < 0) or after the first value it should be after (c.Compare(value) > 0).
  */
 func (self *nodeRef) inject(c Comparable) {
+	ref := &nodeRef{}
+	node := &node{}
 	for {
 		hit := self.search(c)
 		if hit.ref != nil {
-			if hit.ref.pushBefore(c, hit.node) { break }
+			if hit.ref.pushBefore(c, ref, node, hit.node) { break }
 		} else if hit.rightRef != nil {
-			if hit.rightRef.pushBefore(c, hit.rightNode) { break }
+			if hit.rightRef.pushBefore(c, ref, node, hit.rightNode) { break }
 		} else if hit.leftRef != nil {
-			if hit.leftNode.next.pushBefore(c, hit.rightNode) { break }
+			if hit.leftNode.next.pushBefore(c, ref, node, hit.rightNode) { break }
 		} else {
 			panic(fmt.Sprintf("Expected some kind of result from %#v.search(%v), but got %+v", self, c, hit))
 		}
