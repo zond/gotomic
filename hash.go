@@ -4,6 +4,7 @@ package gotomic
 import (
 	"sync/atomic"
 	"bytes"
+	"math"
 	"unsafe"
 	"fmt"
 )
@@ -128,7 +129,9 @@ func (self *Hash) Buckets() map[*nodeRef]uint32 {
 		subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
 		for subIndex := 0; subIndex < len(subBucket); subIndex++ {
 			bucket := (*nodeRef)(subBucket[subIndex])
-			buckets[bucket] = uint32((1 << uint32(superIndex) - 1) + subIndex)
+			if bucket != nil {
+				buckets[bucket] = uint32(math.Pow(2, float64(superIndex - 1)) + float64(subIndex))
+			}
 		}
 	}
 	return buckets
@@ -142,9 +145,9 @@ func (self *Hash) Describe() string {
 		e := node.value.(*entry)
 		if id, ok := buckets[bucket]; ok {
 			super, sub := self.getBucketIndices(id)
-			fmt.Fprintf(buffer, "%3v,%3v: %v *\n", super, sub, e)
+			fmt.Fprintf(buffer, "%3v:%3v,%3v: %v *\n", id, super, sub, e)
 		} else {
-			fmt.Fprintf(buffer, "         %v\n", e)
+			fmt.Fprintf(buffer, "             %v\n", e)
 		}
 		bucket = node.next
 		node = bucket.node()
@@ -254,7 +257,9 @@ func (self *Hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 				node := &node{}
 				hit.leftNode.next.pushBefore(mockEntry, ref, node, hit.rightNode)
 			} else {
-				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.ref))
+				if atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.ref)) {
+					fmt.Println("inserted", hit.node.val(), "at",superIndex, subIndex, "for",index)
+				}
 			}
 		}
 	}

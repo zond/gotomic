@@ -149,7 +149,7 @@ func TestConcurrency(t *testing.T) {
 	h := NewHash()
 	fmt.Println(h.Describe())
 	cmp := make(map[Hashable]Thing)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 4; i++ {
 		k := key(fmt.Sprint("key", i))
 		v := fmt.Sprint("value", i)
 		h.Put(k, v)
