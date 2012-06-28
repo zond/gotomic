@@ -209,7 +209,11 @@ func (self *nodeRef) popExact(old_node *node) bool {
 		return true
 	}
 	deleted_node := &node{old_node.value, old_node.next, true}
-	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(deleted_node))
+	if atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(deleted_node)) {
+		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(deleted_node), deleted_node.next.Pointer)
+		return true
+	}
+	return false
 }
 func (self *nodeRef) pop() Thing {
 	node := self.node()
