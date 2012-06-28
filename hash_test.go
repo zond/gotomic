@@ -2,6 +2,7 @@ package gotomic
 
 import (
 	"testing"
+	"reflect"
 )
 
 type key string
@@ -19,10 +20,20 @@ func (self key) Equals(t thing) bool {
 	return false
 }
 
+func assertMappy(t *testing.T, h *hash, cmp map[Hashable]thing) {
+	if tm := h.toMap(); !reflect.DeepEqual(tm, cmp) {
+		t.Errorf("%v should be %#v but is %#v", h, cmp, tm)
+	}
+}
+
 func TestPutGet(t *testing.T) {
 	h := newHash()
+	assertMappy(t, h, map[Hashable]thing{})
 	h.put(key("a"), "b")
+	assertMappy(t, h, map[Hashable]thing{key("a"): "b"})
 	h.put(key("a"), "b")
+	assertMappy(t, h, map[Hashable]thing{key("a"): "b"})
 	h.put(key("c"), "d")
+	assertMappy(t, h, map[Hashable]thing{key("a"): "b", key("c"): "d"})
 }
 

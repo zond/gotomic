@@ -41,11 +41,7 @@ func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
 }
 
 func assertSlicey(t *testing.T, nr *nodeRef, cmp []thing) {
-	sl := nr.toSlice()
-	if len(sl) != len(cmp) {
-		t.Error(nr, ".toSlice() should be ", cmp, " but is ", sl)
-	}
-	if !reflect.DeepEqual(sl, cmp) {
+	if sl := nr.toSlice(); !reflect.DeepEqual(sl, cmp) {
 		t.Errorf("%v should be %#v but is %#v", nr, cmp, sl)
 	}
 }

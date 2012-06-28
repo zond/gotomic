@@ -67,6 +67,18 @@ func newHash() *hash {
 	rval.buckets[0] = unsafe.Pointer(&b)
 	return rval
 }
+func (self *hash) toMap() map[Hashable]thing {
+	rval := make(map[Hashable]thing)
+	bucket := self.getBucketByHashCode(0)
+	node := bucket.node()
+	for node != nil {
+		if e := node.value.(*entry); e.real() {
+			rval[e.key] = e.val()
+		}
+		node = node.next.node()
+	}
+	return rval
+}
 func (self *hash) describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	for i := 0; i < (1 << self.exponent); i++ {
@@ -90,20 +102,7 @@ func (self *hash) describe() string {
 	return string(buffer.Bytes())
 }
 func (self *hash) String() string {
-	buffer := bytes.NewBufferString("{")
-	node := self.getBucketByHashCode(0).node()
-	for node != nil {
-		e := node.value.(*entry)
-		if e.real() {
-			fmt.Fprintf(buffer, "%#v => %#v", e.key, e.val())
-		}
-		node = node.next.node()
-		if e.real() && node != nil {
-			fmt.Fprint(buffer, ", ")
-		}
-	}
-	fmt.Fprint(buffer, "}")
-	return string(buffer.Bytes())
+	return fmt.Sprint(self.toMap())
 }
 func (self *hash) put(k Hashable, v thing) (rval thing) {
 	newEntry := newRealEntry(k, v)
