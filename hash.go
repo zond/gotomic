@@ -68,8 +68,10 @@ func newHash() *hash {
 	return rval
 }
 func (self *hash) verify() error {
-	if e := self.getBucketByHashCode(0).verify(); e != nil {
-		return e
+	for i := 0; i < (1 << self.exponent); i++ {
+		if e := self.getBucketByHashCode(uint32(i)).verify(); e != nil {
+			return e
+		}
 	}
 	return nil
 }
