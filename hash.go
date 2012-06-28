@@ -108,19 +108,6 @@ func (self *Hash) Verify() error {
 	if e := bucket.verify(); e != nil {
 		return e
 	}
-	node := bucket.node()
-	for node != nil {
-		if en := node.value.(*entry); !en.real() {
-			superIndex, subIndex := self.getBucketIndices(en.hashCode)
-			subBuckets := *(*[]unsafe.Pointer)(self.buckets[superIndex])
-			bucket := (*nodeRef)(subBuckets[subIndex])
-			bucketEntry := bucket.node().value.(*entry)
-			if bucketEntry != en {
-				return fmt.Errorf("%v has a mock entry %v (%#v) that doesn't match the entry in bucket %v,%v: %v (%#v)", self, en, en, superIndex, subIndex, bucketEntry, bucketEntry)
-			}
-		}
-		node = node.next.node()
-	}
 	return nil
 }
 func (self *Hash) ToMap() map[Hashable]Thing {
@@ -137,14 +124,22 @@ func (self *Hash) ToMap() map[Hashable]Thing {
 }
 func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
-	bucket := self.getBucketByHashCode(0)
+	buckets := make(map[*nodeRef]string)
+	for superIndex := 0; superIndex < int(self.exponent); superIndex++ {
+		subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
+		for subIndex := 0; subIndex < len(subBucket); subIndex++ {
+			bucket := (*nodeRef)(subBucket[subIndex])
+			buckets[bucket] = fmt.Sprint(superIndex, ",", subIndex)
+		}
+	}
+	bucket := self.getBucketByIndex(0)
 	node := bucket.node()
 	for node != nil {
 		e := node.value.(*entry)
-		if e.real() {
-			fmt.Fprintln(buffer, "\t", e)
+		if id, ok := buckets[bucket]; ok {
+			fmt.Fprintf(buffer, "%v: %v\n", id, e)
 		} else {
-			fmt.Fprintln(buffer, e)
+			fmt.Fprintf(buffer, "\t%v\n", e)
 		}
 		bucket = node.next
 		node = bucket.node()

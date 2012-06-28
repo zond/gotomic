@@ -143,17 +143,19 @@ func BenchmarkHashConc(b *testing.B) {
 	b.StopTimer()
 	runtime.GOMAXPROCS(1)
 }
-/*
+
 func TestConcurrency(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	h := NewHash()
 	cmp := make(map[Hashable]Thing)
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		k := key(fmt.Sprint("key", i))
 		v := fmt.Sprint("value", i)
 		h.Put(k, v)
 		cmp[k] = v
 	}
+	fmt.Println(h.Describe())
+	/*
 	do := make(chan bool)
 	done := make(chan bool)
 	go fiddleHash(t, h, "fiddlerA", do, done)
@@ -165,9 +167,10 @@ func TestConcurrency(t *testing.T) {
 	<- done
 	<- done
 	<- done
+*/
 	assertMappy(t, h, cmp)
 }
-*/
+
 func TestPutDelete(t *testing.T) {
 	h := NewHash()
 	if v := h.Delete(key("e")); v != nil {
