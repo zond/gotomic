@@ -59,14 +59,51 @@ func fiddleHash(t *testing.T, h *Hash, s string) {
 	}
 }
 
-func TestPut(t *testing.T) {
+func TestPutDelete(t *testing.T) {
 	h := NewHash()
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
 	assertMappy(t, h, map[Hashable]Thing{})
 	h.Put(key("a"), "b")
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
 	assertMappy(t, h, map[Hashable]Thing{key("a"): "b"})
 	h.Put(key("a"), "b")
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
 	assertMappy(t, h, map[Hashable]Thing{key("a"): "b"})
 	h.Put(key("c"), "d")
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
 	assertMappy(t, h, map[Hashable]Thing{key("a"): "b", key("c"): "d"})
+	if v := h.Delete(key("a")); v != "b" {
+		t.Error(h, "should be able to delete 'a' but got ", v)
+	}
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("c"): "d"})
+	if v := h.Delete(key("a")); v != nil {
+		t.Error(h, "should not be able to delete 'a' but got ", v)
+	}
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("c"): "d"})
+	if v := h.Delete(key("c")); v != "d" {
+		t.Error(h, "should be able to delete 'c' but got ", v)
+	}
+	assertMappy(t, h, map[Hashable]Thing{})
+	if v := h.Delete(key("c")); v != nil {
+		t.Error(h, "should not be able to delete 'c' but got ", v)
+	}
+	if v := h.Delete(key("e")); v != nil {
+		t.Error(h, "should not be able to delete 'e' but got ", v)
+	}
+	assertMappy(t, h, map[Hashable]Thing{})
 }
 

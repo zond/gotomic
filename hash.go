@@ -166,6 +166,7 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 		if hit2 := hit.search(testEntry); hit2.node != nil {
 			if hit2.ref.popExact(hit2.node) {
 				rval = hit2.node.value.(*entry).val()
+				self.addSize(-1)
 				break
 			}
 		} else {
