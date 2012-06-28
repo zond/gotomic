@@ -18,6 +18,8 @@ func (self *hashHit) search(cmp *entry) (rval *hashHit) {
 		if rval.node == nil {
 			break
 		}
+		rval.rightRef = rval.node.next
+		rval.rightNode = rval.rightRef.node()
 		e := rval.node.value.(*entry)
 		if !e.real() || e.hashCode != cmp.hashCode {
 			rval.rightRef = rval.ref
@@ -37,6 +39,9 @@ func (self *hashHit) search(cmp *entry) (rval *hashHit) {
 		rval.rightNode = nil
 	}
 	return
+}
+func (self *hashHit) String() string {
+	return fmt.Sprint("&hashHit{", self.leftNode.val(), self.node.val(), self.rightNode.val(), "}")
 }
 
 type Hashable interface {
@@ -67,7 +72,7 @@ func (self *entry) val() Thing {
 	return *(*Thing)(self.value)
 }
 func (self *entry) String() string {
-	return fmt.Sprintf("&entry{%0.32b/%0.32b, %v=>%v}", self.hashCode, self.hashKey, self.key, self.val())
+	return fmt.Sprintf("&entry{%v:%0.32b/%v:%0.32b, %v=>%v}", self.hashCode, self.hashCode, self.hashKey, self.hashKey, self.key, self.val())
 }
 func (self *entry) Compare(t Thing) int {
 	if e, ok := t.(*entry); ok {
@@ -149,14 +154,14 @@ func (self *Hash) Describe() string {
 func (self *Hash) String() string {
 	return fmt.Sprint(self.ToMap())
 }
-func (self *Hash) Get(k Hashable) (rval Thing) {
+func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 	testEntry := newRealEntry(k, nil)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
 	if hit2 := hit.search(testEntry); hit2.node != nil {
-		return hit2.node.value.(*entry).val()
+		return hit2.node.value.(*entry).val(), true
 	}
-	return nil
+	return nil, false
 }
 func (self *Hash) Delete(k Hashable) (rval Thing) {
 	testEntry := newRealEntry(k, nil)
@@ -182,16 +187,16 @@ func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
 		if hit2 := hit.search(newEntry); hit2.node == nil {
-			if hit2.leftNode.next.pushBefore(newEntry, hit.rightNode) {
+			if hit2.leftNode.next.pushBefore(newEntry, hit2.rightNode) {
 				self.addSize(1)
 				rval = nil
-				break
+				return
 			}
 		} else {
 			oldEntry := hit2.node.value.(*entry)
 			rval = *(*Thing)(atomic.LoadPointer(&oldEntry.value))
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
-			break
+			return
 		}
 	}
 	return

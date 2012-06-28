@@ -5,6 +5,7 @@ import (
 	gotomic "../"
 	"runtime/pprof"
 	"fmt"
+	"runtime"
 	"os"
 )
 
@@ -20,6 +21,7 @@ func (self hashInt) Equals(t gotomic.Thing) bool {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	f, err := os.Create("cpuprofile")
 	if err != nil {
 		panic(err.Error())
