@@ -194,6 +194,7 @@ func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 		hit := (*hashHit)(bucket.search(newEntry))
 		if hit2 := hit.search(newEntry); hit2.node == nil {
 			if hit2.leftNode.next.pushBefore(newEntry, ref, node, hit2.rightNode) {
+				fmt.Println("inserted", newEntry, "between", hit2.leftNode.val(), "and", hit2.rightNode.val())
 				self.addSize(1)
 				rval = nil
 				return
@@ -255,7 +256,9 @@ func (self *Hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 			if hit := previousBucket.search(mockEntry); hit.node == nil {
 				ref := &nodeRef{}
 				node := &node{}
-				hit.leftNode.next.pushBefore(mockEntry, ref, node, hit.rightNode)
+				if hit.leftNode.next.pushBefore(mockEntry, ref, node, hit.rightNode) {
+					fmt.Println("inserted", mockEntry, "between", hit.leftNode.val(), "and", hit.rightNode.val())
+				}
 			} else {
 				if atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.ref)) {
 					fmt.Println("inserted", hit.node.val(), "at",superIndex, subIndex, "for",index)
