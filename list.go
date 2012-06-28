@@ -77,6 +77,10 @@ func (self *nodeRef) pushBefore(t thing, n *node) bool {
 func (self *nodeRef) push(c thing) {
 	for !self.pushBefore(c, self.node()) {}
 }
+/*
+ * inject c into self either before the first matching value (c.Compare(value) == 0), before the first value
+ * it should be before (c.Compare(value) < 0) or after the first value it should be after (c.Compare(value) > 0).
+ */
 func (self *nodeRef) inject(c Comparable) {
 	for {
 		hit := self.search(c)
@@ -85,12 +89,15 @@ func (self *nodeRef) inject(c Comparable) {
 		} else if hit.rightRef != nil {
 			if hit.rightRef.pushBefore(c, hit.rightNode) { break }
 		} else if hit.leftRef != nil {
-			if hit.leftRef.pushBefore(c, hit.leftNode) { break }
+			if hit.leftNode.next.pushBefore(c, hit.rightNode) { break }
 		} else {
 			panic(fmt.Sprintf("Expected some kind of result from %#v.search(%v), but got %+v", self, c, hit))
 		}
 	}
 }
+/*
+ * Verify that all Comparable values in this list are after values they should be after (c.Compare(last) >= 0).
+ */
 func (self *nodeRef) verify() error {
 	node := self.node()
 	if node == nil {
@@ -122,6 +129,15 @@ func (self *nodeRef) verify() error {
 	return fmt.Errorf("%v is badly ordered. The following nodes are in the wrong order: %v", self, string(buffer.Bytes()));
 	
 }
+/*
+ * search for c in self.
+ *
+ * Will stop searching when finding nil or an element that should be after c (c.Compare(element) < 0).
+ *
+ * Will return a hit containing the last nodeRef and node before a match (if no match, the last nodeRef and node before
+ * it stops searching), the nodeRef and node for the match (if a match) and the last nodeRef and node after the match
+ * (if no match, the first nodeRef and node, or nil/nil if at the end of the list).
+ */
 func (self *nodeRef) search(c Comparable) (rval *hit) {
 	rval = &hit{nil, nil, self, self.node(), nil, nil}
 	for {

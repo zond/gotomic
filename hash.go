@@ -11,6 +11,30 @@ import (
 const MAX_EXPONENT = 32
 const DEFAULT_LOAD_FACTOR = 0.5
 
+type hashHit hit
+func (self *hashHit) search(cmp *entry) (node *node) {
+	node = self.node
+	for {
+		if node == nil {
+			break
+		}
+		e := node.value.(*entry)
+		if !e.real() {
+			node = nil
+			break
+		}
+		if e.hashCode != cmp.hashCode {
+			node = nil
+			break
+		}
+		if cmp.key.Equals(e.key) {
+			break
+		}
+		node = node.next.node()
+	}
+	return
+}
+
 type Hashable interface {
 	Equals(thing) bool
 	HashCode() uint32
@@ -68,6 +92,17 @@ func newHash() *hash {
 	return rval
 }
 func (self *hash) verify() error {
+	bucket := self.getBucketByHashCode(0)
+	if e := bucket.verify(); e != nil {
+		return e
+	}
+	node := bucket.node()
+	for node != nil {
+		if en := node.value.(*entry); !en.real() {
+//			superIndex, subIndex := self.getBucketIndices(en.hashCode)
+		}
+		node = node.next.node()
+	}
 	for i := 0; i < (1 << self.exponent); i++ {
 		if e := self.getBucketByHashCode(uint32(i)).verify(); e != nil {
 			return e
@@ -111,29 +146,6 @@ func (self *hash) describe() string {
 }
 func (self *hash) String() string {
 	return fmt.Sprint(self.toMap())
-}
-type hashHit hit
-func (self *hashHit) search(cmp *entry) (node *node) {
-	node = self.node
-	for {
-		if node == nil {
-			break
-		}
-		e := node.value.(*entry)
-		if !e.real() {
-			node = nil
-			break
-		}
-		if e.hashCode != cmp.hashCode {
-			node = nil
-			break
-		}
-		if cmp.key.Equals(e.key) {
-			break
-		}
-		node = node.next.node()
-	}
-	return
 }
 func (self *hash) put(k Hashable, v thing) (rval thing) {
 	newEntry := newRealEntry(k, v)
@@ -202,7 +214,7 @@ func (self *hash) getBucketByIndex(index uint32) (bucket *nodeRef) {
 			prev := self.getPreviousBucketIndex(mockEntry.hashKey)
 			previousBucket := self.getBucketByIndex(prev)
 			if hit := previousBucket.search(mockEntry); hit.node == nil {
-				hit.rightRef.pushBefore(mockEntry, hit.rightNode)
+				hit.leftNode.next.pushBefore(mockEntry, hit.rightNode)
 			} else {
 				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.ref))
 			}
