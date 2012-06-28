@@ -59,11 +59,17 @@ func (self *List) Pop() Thing {
 	atomic.AddInt64(&self.size, -1)
 	return self.nodeRef.pop()
 }
+func (self *List) String() string {
+	return fmt.Sprint(self.nodeRef.ToSlice())
+}
 func (self *List) Search(c Comparable) Thing {
 	if hit := self.nodeRef.search(c); hit.node != nil {
 		return hit.node.value
 	}
 	return nil
+}
+func (self *List) Size() int {
+	return int(atomic.LoadInt64(&self.size))
 }
 func (self *List) Inject(c Comparable) {
 	self.nodeRef.inject(c)
@@ -84,7 +90,7 @@ func (self *nodeRef) node() *node {
 	}
 	return next_ok
 }
-func (self *nodeRef) toSlice() []Thing {
+func (self *nodeRef) ToSlice() []Thing {
 	rval := make([]Thing, 0)
 	current := self.node()
 	for current != nil {

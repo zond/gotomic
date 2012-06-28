@@ -40,8 +40,42 @@ func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
 	done <- true
 }
 
+func assertListy(t *testing.T, l *List, cmp []Thing) {
+	if l.Size() != len(cmp) {
+		t.Errorf("%v should have size %v but had %v", l, len(cmp), l.Size())
+	}
+	if sl := l.ToSlice(); !reflect.DeepEqual(sl, cmp) {
+		t.Errorf("%v should be %#v but is %#v", l, cmp, sl)
+	}
+	tmp := make([]Thing, len(cmp))
+	for ind, v := range cmp {
+		popped := l.Pop() 
+		tmp[len(cmp) - ind - 1] = popped
+		if !reflect.DeepEqual(v, popped) {
+			t.Errorf("element %v of %v should be %v but was %v", ind, l, v, popped)
+		}
+	}
+	for _, v := range tmp {
+		l.Push(v)
+	}
+}
+
+func TestList(t *testing.T) {
+	l := NewList()
+	assertListy(t, l, []Thing{})
+	l.Push("plur")
+	assertListy(t, l, []Thing{"plur"})
+	l.Push("knap")
+	assertListy(t, l, []Thing{"knap", "plur"})
+	l.Push("hehu")
+	assertListy(t, l, []Thing{"hehu", "knap", "plur"})
+	l.Push("blar")
+	assertListy(t, l, []Thing{"blar", "hehu","knap","plur"})
+	
+}
+
 func assertSlicey(t *testing.T, nr *nodeRef, cmp []Thing) {
-	if sl := nr.toSlice(); !reflect.DeepEqual(sl, cmp) {
+	if sl := nr.ToSlice(); !reflect.DeepEqual(sl, cmp) {
 		t.Errorf("%v should be %#v but is %#v", nr, cmp, sl)
 	}
 }
