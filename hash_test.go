@@ -3,7 +3,14 @@ package gotomic
 import (
 	"testing"
 	"reflect"
+	"fmt"
+	"math/rand"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 type key string
 func (self key) HashCode() uint32 {
@@ -37,7 +44,22 @@ func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
 	}
 }
 
-func TestPutGet(t *testing.T) {
+func fiddleHash(t *testing.T, h *Hash, s string) {
+	cmp := make(map[Hashable]Thing)
+	for i := 0; i < 1000; i++ {
+		k := key(fmt.Sprint(s, rand.Int()))
+		v := fmt.Sprint(k, "value")
+		h.Put(k, v)
+		cmp[k] = v
+	}
+	for k, v := range cmp {
+		if hv := h.Get(k); !reflect.DeepEqual(hv, v) {
+			t.Errorf("[%v] should produce %v but produced %v", k, v, hv)
+		}
+	}
+}
+
+func TestPut(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
 	h.Put(key("a"), "b")

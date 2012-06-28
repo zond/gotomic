@@ -197,22 +197,22 @@ func (self *nodeRef) search(c Comparable) (rval *hit) {
 	}
 	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
 }
-func (self *nodeRef) pop() Thing {
-	old_node := self.node()
+func (self *nodeRef) popExact(old_node *node) bool {
 	if old_node == nil {
-		return nil
+		return true
 	}
 	deleted_node := &node{old_node.value, old_node.next, true}
-	for !atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(deleted_node)) {
-		old_node = self.node()
-		if old_node == nil {
-			return nil 
-		}
-		deleted_node.value = old_node.value
-		deleted_node.next = old_node.next
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(deleted_node))
+}
+func (self *nodeRef) pop() Thing {
+	node := self.node()
+	for !self.popExact(node) {
+		node = self.node()
 	}
-	self.node()
-	return old_node.value
+	if node != nil {
+		return node.value
+	}
+	return nil
 }
 func (self *nodeRef) String() string {
 	return fmt.Sprint(self.node())

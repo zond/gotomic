@@ -71,7 +71,6 @@ func TestList(t *testing.T) {
 	assertListy(t, l, []Thing{"hehu", "knap", "plur"})
 	l.Push("blar")
 	assertListy(t, l, []Thing{"blar", "hehu","knap","plur"})
-	
 }
 
 func assertSlicey(t *testing.T, nr *nodeRef, cmp []Thing) {

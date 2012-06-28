@@ -12,25 +12,29 @@ const MAX_EXPONENT = 32
 const DEFAULT_LOAD_FACTOR = 0.5
 
 type hashHit hit
-func (self *hashHit) search(cmp *entry) (node *node) {
-	node = self.node
+func (self *hashHit) search(cmp *entry) (rval *hashHit) {
+	rval = &hashHit{self.leftRef, self.leftNode, self.ref, self.node, self.rightRef, self.rightNode}
 	for {
-		if node == nil {
+		if rval.node == nil {
 			break
 		}
-		e := node.value.(*entry)
-		if !e.real() {
-			node = nil
-			break
-		}
-		if e.hashCode != cmp.hashCode {
-			node = nil
+		e := rval.node.value.(*entry)
+		if !e.real() || e.hashCode != cmp.hashCode {
+			rval.rightRef = rval.ref
+			rval.rightNode = rval.node
+			rval.ref = nil
+			rval.node = nil
 			break
 		}
 		if cmp.key.Equals(e.key) {
 			break
 		}
-		node = node.next.node()
+		rval.leftRef = rval.ref
+		rval.leftNode = rval.leftRef.node()
+		rval.ref = rval.leftNode.next
+		rval.node = rval.ref.node()
+		rval.rightRef = nil
+		rval.rightNode = nil
 	}
 	return
 }
@@ -149,24 +153,41 @@ func (self *Hash) Get(k Hashable) (rval Thing) {
 	testEntry := newRealEntry(k, nil)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
-	if node := hit.search(testEntry); node != nil {
-		return hit.node.value.(*entry).val()
+	if hit2 := hit.search(testEntry); hit2.node != nil {
+		return hit2.node.value.(*entry).val()
 	}
 	return nil
+}
+func (self *Hash) Delete(k Hashable) (rval Thing) {
+	testEntry := newRealEntry(k, nil)
+	for {
+		bucket := self.getBucketByHashCode(testEntry.hashCode)
+		hit := (*hashHit)(bucket.search(testEntry))
+		if hit2 := hit.search(testEntry); hit2.node != nil {
+			if hit2.ref.popExact(hit2.node) {
+				rval = hit2.node.value.(*entry).val()
+				break
+			}
+		} else {
+			rval = nil
+			break
+		}
+	}
+	return
 }
 func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 	newEntry := newRealEntry(k, v)
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
-		if node := hit.search(newEntry); node == nil {
-			if hit.leftNode.next.pushBefore(newEntry, hit.rightNode) {
+		if hit2 := hit.search(newEntry); hit2.node == nil {
+			if hit2.leftNode.next.pushBefore(newEntry, hit.rightNode) {
 				self.addSize(1)
 				rval = nil
 				break
 			}
 		} else {
-			oldEntry := hit.node.value.(*entry)
+			oldEntry := hit2.node.value.(*entry)
 			rval = *(*Thing)(atomic.LoadPointer(&oldEntry.value))
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
 			break
