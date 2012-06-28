@@ -67,6 +67,12 @@ func newHash() *hash {
 	rval.buckets[0] = unsafe.Pointer(&b)
 	return rval
 }
+func (self *hash) verify() error {
+	if e := self.getBucketByHashCode(0).verify(); e != nil {
+		return e
+	}
+	return nil
+}
 func (self *hash) toMap() map[Hashable]thing {
 	rval := make(map[Hashable]thing)
 	bucket := self.getBucketByHashCode(0)

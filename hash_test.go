@@ -22,6 +22,9 @@ func (self key) Equals(t thing) bool {
 }
 
 func assertMappy(t *testing.T, h *hash, cmp map[Hashable]thing) {
+	if e := h.verify(); e != nil {
+		t.Errorf("%v should be valid, got %v", e)
+	}
 	if tm := h.toMap(); !reflect.DeepEqual(tm, cmp) {
 		t.Errorf("%v should be %#v but is %#v", h, cmp, tm)
 	}
