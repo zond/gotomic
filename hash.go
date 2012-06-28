@@ -122,24 +122,29 @@ func (self *Hash) ToMap() map[Hashable]Thing {
 	}
 	return rval
 }
-func (self *Hash) Describe() string {
-	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
-	buckets := make(map[*nodeRef]string)
-	for superIndex := 0; superIndex < int(self.exponent); superIndex++ {
+func (self *Hash) Buckets() map[*nodeRef]uint32 {
+	buckets := make(map[*nodeRef]uint32)
+	for superIndex := 0; superIndex < int(self.exponent + 1); superIndex++ {
 		subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
 		for subIndex := 0; subIndex < len(subBucket); subIndex++ {
 			bucket := (*nodeRef)(subBucket[subIndex])
-			buckets[bucket] = fmt.Sprint(superIndex, ",", subIndex)
+			buckets[bucket] = uint32((1 << uint32(superIndex) - 1) + subIndex)
 		}
 	}
+	return buckets
+}
+func (self *Hash) Describe() string {
+	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	bucket := self.getBucketByIndex(0)
+	buckets := self.Buckets()
 	node := bucket.node()
 	for node != nil {
 		e := node.value.(*entry)
 		if id, ok := buckets[bucket]; ok {
-			fmt.Fprintf(buffer, "%v: %v\n", id, e)
+			super, sub := self.getBucketIndices(id)
+			fmt.Fprintf(buffer, "%3v,%3v: %v *\n", super, sub, e)
 		} else {
-			fmt.Fprintf(buffer, "\t%v\n", e)
+			fmt.Fprintf(buffer, "         %v\n", e)
 		}
 		bucket = node.next
 		node = bucket.node()
