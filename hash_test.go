@@ -115,12 +115,14 @@ func BenchmarkHash(b *testing.B) {
 }
 
 func action(b *testing.B, m *Hash, i int, do, done chan bool) {
-	k := hashInt(i)
 	<- do
-	m.Put(k, i)
-	j, _ := m.Get(k)
-	if j != i {
-		b.Error("should be same value")
+	for j := 0; j < i; j++ {
+		k := hashInt(j)
+		m.Put(k, j)
+		l, _ := m.Get(k)
+		if l != j {
+			b.Error("should be same value")
+		}
 	}
 	done <- true
 }
@@ -130,12 +132,12 @@ func BenchmarkHashConc(b *testing.B) {
 	do := make(chan bool)
 	done := make(chan bool)
 	m := NewHash()
-	for i := 0; i < b.N; i++ {
-		go action(b, m, i, do, done)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go action(b, m, b.N, do, done)
 	}
 	close(do)
 	b.StartTimer()
-	for i := 0; i < b.N; i++ {
+	for i := 0; i < runtime.NumCPU(); i++ {
 		<- done
 	}
 	b.StopTimer()
