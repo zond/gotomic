@@ -2,7 +2,6 @@ package gotomic
 
 import (
 	"testing"
-	"fmt"
 )
 
 type key string
@@ -22,12 +21,8 @@ func (self key) Equals(t thing) bool {
 
 func TestPutGet(t *testing.T) {
 	h := newHash()
-	fmt.Println(h.describe())
 	h.put(key("a"), "b")
-	fmt.Println(h.describe())
 	h.put(key("a"), "b")
-	fmt.Println(h.describe())
 	h.put(key("c"), "d")
-	fmt.Println(h.describe())
 }
 

@@ -59,7 +59,7 @@ func (self *nodeRef) node() *node {
 	return next_ok
 }
 func (self *nodeRef) toSlice() []thing {
-	var rval []thing
+	rval := make([]thing, 0)
 	current := self.node()
 	for current != nil {
 		rval = append(rval, current.value)

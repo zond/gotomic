@@ -30,17 +30,8 @@ func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
 	num := 1000
 	for i := 0; i < num; i++ {
 		nr.inject(c(-int(math.Abs(float64(rand.Int())))))
-		stuff := nr.toSlice()
-		var last Comparable
-		for _, item := range stuff {
-			if s, ok := item.(Comparable); ok {
-				if s.Compare(last) < 0 {
-					t.Error(nr, " should be sorted, but ", s, " should really be before ", last)
-				}
-				last = s
-			} else {
-				t.Error(nr, " should contain only Comparable items, but found ", item)
-			}
+		if err := nr.verify(); err != nil {
+			t.Error(nr, "should be correct, but got", err)
 		}
 	}
 	for i := 0; i < num; i++ {
@@ -54,10 +45,8 @@ func assertSlicey(t *testing.T, nr *nodeRef, cmp []thing) {
 	if len(sl) != len(cmp) {
 		t.Error(nr, ".toSlice() should be ", cmp, " but is ", sl)
 	}
-	for index, th := range cmp {
-		if !reflect.DeepEqual(sl[index], th) {
-			t.Error(nr, ".toSlice()[", index, "] should be ", th, " but is ", sl[index])
-		}
+	if !reflect.DeepEqual(sl, cmp) {
+		t.Errorf("%v should be %#v but is %#v", nr, cmp, sl)
 	}
 }
 
