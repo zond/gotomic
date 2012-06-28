@@ -204,11 +204,13 @@ func (self *nodeRef) search(c Comparable) (rval *hit) {
 	}
 	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
 }
-func (self *nodeRef) popExact(old_node *node) bool {
+func (self *nodeRef) popExact(deleted_node, old_node *node) bool {
 	if old_node == nil {
 		return true
 	}
-	deleted_node := &node{old_node.value, old_node.next, true}
+	deleted_node.value = old_node.value
+	deleted_node.next = old_node.next
+	deleted_node.deleted = true
 	if atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(deleted_node)) {
 		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(deleted_node), deleted_node.next.Pointer)
 		return true
@@ -216,12 +218,13 @@ func (self *nodeRef) popExact(old_node *node) bool {
 	return false
 }
 func (self *nodeRef) pop() Thing {
-	node := self.node()
-	for !self.popExact(node) {
-		node = self.node()
+	n := self.node()
+	alloc := &node{}
+	for !self.popExact(alloc, n) {
+		n = self.node()
 	}
-	if node != nil {
-		return node.value
+	if n != nil {
+		return n.value
 	}
 	return nil
 }
