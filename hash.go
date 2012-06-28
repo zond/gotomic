@@ -94,7 +94,7 @@ func NewHash() *Hash {
 func (self *Hash) Size() int {
 	return int(atomic.LoadUint64(&self.size))
 }
-func (self *Hash) verify() error {
+func (self *Hash) Verify() error {
 	bucket := self.getBucketByHashCode(0)
 	if e := bucket.verify(); e != nil {
 		return e
@@ -114,7 +114,7 @@ func (self *Hash) verify() error {
 	}
 	return nil
 }
-func (self *Hash) toMap() map[Hashable]thing {
+func (self *Hash) ToMap() map[Hashable]thing {
 	rval := make(map[Hashable]thing)
 	bucket := self.getBucketByHashCode(0)
 	node := bucket.node()
@@ -126,7 +126,7 @@ func (self *Hash) toMap() map[Hashable]thing {
 	}
 	return rval
 }
-func (self *Hash) describe() string {
+func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	bucket := self.getBucketByHashCode(0)
 	node := bucket.node()
@@ -143,9 +143,9 @@ func (self *Hash) describe() string {
 	return string(buffer.Bytes())
 }
 func (self *Hash) String() string {
-	return fmt.Sprint(self.toMap())
+	return fmt.Sprint(self.ToMap())
 }
-func (self *Hash) get(k Hashable) (rval thing) {
+func (self *Hash) Get(k Hashable) (rval thing) {
 	testEntry := newRealEntry(k, nil)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
@@ -154,7 +154,7 @@ func (self *Hash) get(k Hashable) (rval thing) {
 	}
 	return nil
 }
-func (self *Hash) put(k Hashable, v thing) (rval thing) {
+func (self *Hash) Put(k Hashable, v thing) (rval thing) {
 	newEntry := newRealEntry(k, v)
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
