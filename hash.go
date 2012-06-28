@@ -99,14 +99,15 @@ func (self *hash) verify() error {
 	node := bucket.node()
 	for node != nil {
 		if en := node.value.(*entry); !en.real() {
-//			superIndex, subIndex := self.getBucketIndices(en.hashCode)
+			superIndex, subIndex := self.getBucketIndices(en.hashCode)
+			subBuckets := *(*[]unsafe.Pointer)(self.buckets[superIndex])
+			bucket := (*nodeRef)(subBuckets[subIndex])
+			bucketEntry := bucket.node().value.(*entry)
+			if bucketEntry != en {
+				return fmt.Errorf("%v has a mock entry %v (%#v) that doesn't match the entry in bucket %v,%v: %v (%#v)", self, en, en, superIndex, subIndex, bucketEntry, bucketEntry)
+			}
 		}
 		node = node.next.node()
-	}
-	for i := 0; i < (1 << self.exponent); i++ {
-		if e := self.getBucketByHashCode(uint32(i)).verify(); e != nil {
-			return e
-		}
 	}
 	return nil
 }
@@ -124,9 +125,6 @@ func (self *hash) toMap() map[Hashable]thing {
 }
 func (self *hash) describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&hash{%p size:%v exp:%v load:%v}\n", self, self.size, self.exponent, self.loadFactor))
-	for i := 0; i < (1 << self.exponent); i++ {
-		self.getBucketByHashCode(uint32(i))
-	}
 	bucket := self.getBucketByHashCode(0)
 	node := bucket.node()
 	for node != nil {
@@ -134,9 +132,6 @@ func (self *hash) describe() string {
 		if e.real() {
 			fmt.Fprintln(buffer, "\t", e)
 		} else {
-			if self.getBucketByHashCode(e.hashCode) != bucket {
-				fmt.Printf("%v with hashCode %v should get %#v as bucket, but got %#v\n", e, e.hashCode, self.getBucketByHashCode(e.hashCode), bucket)
-			}
 			fmt.Fprintln(buffer, e)
 		}
 		bucket = node.next
@@ -153,7 +148,6 @@ func (self *hash) put(k Hashable, v thing) (rval thing) {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
 		if node := hit.search(newEntry); node == nil {
-			fmt.Printf("going to push %v before %v in %#v\n", newEntry, hit.leftNode, hit.leftRef)
 			if hit.leftNode.next.pushBefore(newEntry, hit.rightNode) {
 				self.addSize(1)
 				rval = nil
