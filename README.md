@@ -38,3 +38,8 @@ Notice that as expected a) is by far the fastest mapping, but if you want a thre
 
 See https://github.com/zond/gotomic/blob/master/examples/example.go or https://github.com/zond/gotomic/blob/master/examples/benchmark.go
 
+## Bugs
+
+There seems to be a race condition in the List implementation (run the tests many times and the concurrency tests will warn now and then). Oddly enough the Hash seems to recover enough to still contain the proper data when the test is finished.
+
+Not production ready, unfortunately.

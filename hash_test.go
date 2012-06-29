@@ -49,7 +49,7 @@ func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
 func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
 	<- do
 	cmp := make(map[Hashable]Thing)
-	n := 100
+	n := 10000
 	for i := 0; i < n; i++ {
 		k := key(fmt.Sprint(s, rand.Int()))
 		v := fmt.Sprint(k, "value")
