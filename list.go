@@ -23,7 +23,7 @@ type Comparable interface {
 type Thing interface{}
 
 /*
- * List is a singly linked list based on "A Pragmatic Implementation of Non-Blocking Linked-Lists by Timothy L. Harris" <http://www.timharris.co.uk/papers/2001-disc.pdf>
+ * List is a singly linked list based on "A Pragmatic Implementation of Non-Blocking Linked-Lists" by Timothy L. Harris <http://www.timharris.co.uk/papers/2001-disc.pdf>
  *
  * It is thread safe and non-blocking, and supports ordered elements by using List#inject with values implementing Comparable.
  */

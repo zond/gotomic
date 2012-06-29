@@ -39,6 +39,9 @@ func (self *hashHit) String() string {
 	return fmt.Sprint("&hashHit{", self.left.val(), self.node.val(), self.right.val(), "}")
 }
 
+/*
+ * Hashable types can be in a Hash.
+ */
 type Hashable interface {
 	Equals(Thing) bool
 	HashCode() uint32
@@ -85,7 +88,11 @@ func (self *entry) Compare(t Thing) int {
 	panic(fmt.Errorf("%v can only compare itself against other *entry, not against %v", self, t))
 }
 
-
+/*
+ * Hash is a hash table based on "Split-Ordered Lists: Lock-Free Extensible Hash Tables" by Ori Shalev and Nir Shavit <http://www.cs.ucf.edu/~dcm/Teaching/COT4810-Spring2011/Literature/SplitOrderedLists.pdf>.
+ *
+ * The short story is that it creates a linked list containing all hashed entries, and a cleverly extensible table of 'shortcuts' into said list.
+ */
 type Hash struct {
 	exponent uint32
 	buckets []unsafe.Pointer
@@ -101,12 +108,15 @@ func NewHash() *Hash {
 func (self *Hash) Size() int {
 	return int(atomic.LoadInt64(&self.size))
 }
+/*
+ * Verify the integrity of the Hash. Used mostly in my own tests but go ahead and call it if you fear corruption.
+ */
 func (self *Hash) Verify() error {
 	bucket := self.getBucketByHashCode(0)
 	if e := bucket.verify(); e != nil {
 		return e
 	}
-	buckets := self.Buckets()
+	buckets := self.bucketMap()
 	for bucket != nil {
 		if hashCode, ok := buckets[bucket]; ok {
 			e := bucket.value.(*entry)
@@ -122,6 +132,9 @@ func (self *Hash) Verify() error {
 	}
 	return nil
 }
+/*
+ * ToMap returns a map[Hashable]Thing that is logically identical to the Hash.
+ */
 func (self *Hash) ToMap() map[Hashable]Thing {
 	rval := make(map[Hashable]Thing)
 	node := self.getBucketByHashCode(0)
@@ -133,7 +146,7 @@ func (self *Hash) ToMap() map[Hashable]Thing {
 	}
 	return rval
 }
-func (self *Hash) Buckets() map[*node]uint32 {
+func (self *Hash) bucketMap() map[*node]uint32 {
 	buckets := make(map[*node]uint32)
 	for superIndex := 0; superIndex < int(self.exponent + 1); superIndex++ {
 		subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
@@ -149,7 +162,7 @@ func (self *Hash) Buckets() map[*node]uint32 {
 func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v maxload:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	node := self.getBucketByIndex(0)
-	buckets := self.Buckets()
+	buckets := self.bucketMap()
 	for node != nil {
 		e := node.value.(*entry)
 		if id, ok := buckets[node]; ok {
