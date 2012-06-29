@@ -22,6 +22,11 @@ type Comparable interface {
 
 type Thing interface{}
 
+/*
+ * List is a singly linked list based on "A Pragmatic Implementation of Non-Blocking Linked-Lists by Timothy L. Harris" <http://www.timharris.co.uk/papers/2001-disc.pdf>
+ *
+ * It is thread safe and non-blocking, and supports ordered elements by using List#inject with values implementing Comparable.
+ */
 type List struct {
 	*node
 	size int64
@@ -29,10 +34,16 @@ type List struct {
 func NewList() *List {
 	return &List{&node{}, 0}
 }
+/*
+ * Push adds t to the top of the List.
+ */
 func (self *List) Push(t Thing) {
 	self.node.add(t)
 	atomic.AddInt64(&self.size, 1)
 }
+/*
+ * Pop removes and returns the top of the List.
+ */
 func (self *List) Pop() Thing {
 	rval := self.node.remove()
 	atomic.AddInt64(&self.size, -1)
@@ -41,9 +52,15 @@ func (self *List) Pop() Thing {
 func (self *List) String() string {
 	return fmt.Sprint(self.ToSlice())
 }
+/*
+ * ToSlice returns a []Thing that is logically identical to the List.
+ */
 func (self *List) ToSlice() []Thing {
 	return self.node.next().ToSlice()
 }
+/*
+ * Search return the first element in the list that matches c (c.Compare(element) == 0)
+ */
 func (self *List) Search(c Comparable) Thing {
 	if hit := self.node.search(c); hit.node != nil {
 		return hit.node.val()
@@ -53,6 +70,9 @@ func (self *List) Search(c Comparable) Thing {
 func (self *List) Size() int {
 	return int(self.size)
 }
+/*
+ * Inject c into the List at the first place where it is <= to all elements before it.
+ */
 func (self *List) Inject(c Comparable) {
 	self.node.inject(c)
 	atomic.AddInt64(&self.size, 1)
