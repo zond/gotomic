@@ -159,6 +159,10 @@ func (self *Hash) bucketMap() map[*node]uint32 {
 	}
 	return buckets
 }
+/*
+ * Describe returns a multi line description of the contents of the map for 
+ * those of you interested in debugging it or seeing an example of how split-ordered lists work.
+ */
 func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v maxload:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	node := self.getBucketByIndex(0)
@@ -178,6 +182,9 @@ func (self *Hash) Describe() string {
 func (self *Hash) String() string {
 	return fmt.Sprint(self.ToMap())
 }
+/*
+ * Get returns the value at k and whether it was present in the Hash.
+ */
 func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 	testEntry := newRealEntry(k, nil)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
@@ -187,6 +194,9 @@ func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 	}
 	return nil, false
 }
+/*
+ * Delete removes k from the Hash and returns any value it removed.
+ */
 func (self *Hash) Delete(k Hashable) (rval Thing) {
 	testEntry := newRealEntry(k, nil)
 	for {
@@ -205,6 +215,9 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 	}
 	return
 }
+/*
+ * Put k and v in the Hash and return any overwritten value.
+ */
 func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 	newEntry := newRealEntry(k, v)
 	alloc := &node{}
