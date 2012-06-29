@@ -155,7 +155,6 @@ func TestConcurrency(t *testing.T) {
 		cmp[k] = v
 	}
 	assertMappy(t, h, cmp)
-	/*
 	do := make(chan bool)
 	done := make(chan bool)
 	go fiddleHash(t, h, "fiddlerA", do, done)
@@ -167,7 +166,6 @@ func TestConcurrency(t *testing.T) {
 	<- done
 	<- done
 	<- done
-*/
 	assertMappy(t, h, cmp)
 }
 

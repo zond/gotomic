@@ -243,6 +243,18 @@ func TestInjectAndSearch(t *testing.T) {
 	searchTest(t, nr, c(9), c(8), c(9), nil)
 	searchTest(t, nr, c(10), c(9), nil, nil)
 	searchTest(t, nr, c(11), c(9), nil, nil)
+}
+
+func TestConcInjectAndSearch(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	nr := new(node)
+	nr.inject(c(3))
+	nr.inject(c(5))
+	nr.inject(c(9))
+	nr.inject(c(7))
+	nr.inject(c(4))
+	nr.inject(c(8))
+	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
 	do := make(chan bool)
 	done := make(chan bool)
 	go fiddleAndAssertSort(t, nr, do, done)
