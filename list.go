@@ -198,11 +198,7 @@ func (self *node) removeExact(allocatedNode, oldNode *node) bool {
 	allocatedNode.value = oldNode.value
 	allocatedNode.Pointer = oldNode.Pointer
 	allocatedNode.deleted = true
-	if atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(oldNode), unsafe.Pointer(allocatedNode)) {
-		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(allocatedNode), allocatedNode.Pointer)
-		return true
-	}
-	return false
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(oldNode), unsafe.Pointer(allocatedNode))
 }
 func (self *node) remove() Thing {
 	alloc := &node{}
