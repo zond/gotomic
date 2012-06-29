@@ -25,19 +25,24 @@ func fiddle(nr *node, do, done chan bool) {
 	done <- true
 }
 
-func fiddleAndAssertSort(t *testing.T, nr *node, do, done chan bool) {
+func fiddleAndAssertSort(t *testing.T, nr *node, do chan bool, ichan, rchan chan []c) {
 	<- do
 	num := 1000
+	var injected []c
+	var removed []c
 	for i := 0; i < num; i++ {
-		nr.inject(c(-int(math.Abs(float64(rand.Int())))))
+		v := c(-int(math.Abs(float64(rand.Int()))))
+		nr.inject(v)
+		injected = append(injected, v)
 		if err := nr.verify(); err != nil {
 			t.Error(nr, "should be correct, but got", err)
 		}
 	}
 	for i := 0; i < num; i++ {
-		nr.remove()
+		removed = append(removed, nr.remove().(c))
 	}
-	done <- true
+	ichan <- injected
+	rchan <- removed
 }
 
 func assertListy(t *testing.T, l *List, cmp []Thing) {
@@ -256,13 +261,15 @@ func TestConcInjectAndSearch(t *testing.T) {
 	nr.inject(c(8))
 	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
 	do := make(chan bool)
-	done := make(chan bool)
-	go fiddleAndAssertSort(t, nr, do, done)
-	go fiddleAndAssertSort(t, nr, do, done)
-	go fiddleAndAssertSort(t, nr, do, done)
-	go fiddleAndAssertSort(t, nr, do, done)
+	ichan := make(chan []c)
+	rchan := make(chan []c)
+	var injected [][]c
+	var removed [][]c
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go fiddleAndAssertSort(t, nr, do, ichan, rchan)
+	}
 	close(do)
-	for i := 0; i < 4; i++ {
+	for i := 0; i < runtime.NumCPU(); i++ {
 		searchTest(t, nr, c(1), ANY, ANY, c(3))
 		searchTest(t, nr, c(2), ANY, ANY, c(3))
 		searchTest(t, nr, c(3), ANY, c(3), c(4))
@@ -274,7 +281,29 @@ func TestConcInjectAndSearch(t *testing.T) {
 		searchTest(t, nr, c(9), c(8), c(9), nil)
 		searchTest(t, nr, c(10), c(9), nil, nil)
 		searchTest(t, nr, c(11), c(9), nil, nil)
-		<-done
+		injected = append(injected, <- ichan)
+		removed = append(removed, <- rchan)
 	}
 	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
+	imap := make(map[c]int)
+	for _, vals := range injected {
+		for _, val := range vals {
+			imap[val] = imap[val] + 1
+		}
+	}
+	rmap := make(map[c]int)
+	for _, vals := range removed {
+		for _, val := range vals {
+			rmap[val] = rmap[val] + 1
+		}
+	}
+	for val, num := range imap {
+		if num2, ok := rmap[val]; ok {
+			if num2 != num {
+				t.Errorf("fiddlers injected %v of %v but removed %v", num, val, num2)
+			}
+		} else {
+			t.Errorf("fiddlers injected %v of %v but removed none")
+		}
+	}
 }
