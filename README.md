@@ -24,7 +24,7 @@ a)
 
 b)
 
-    BenchmarkHashConc	   50000	     54408 ns/op
+    BenchmarkMyMapConc	   50000	     54408 ns/op
     BenchmarkMyMap	 1000000	      2885 ns/op
 
 c)
