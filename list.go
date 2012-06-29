@@ -8,15 +8,12 @@ import (
 )
 
 type hit struct {
-	leftRef *nodeRef
-	leftNode *node
-	ref *nodeRef
+	left *node
 	node *node
-	rightRef *nodeRef
-	rightNode *node
+	right *node
 }
 func (self *hit) String() string {
-	return fmt.Sprintf("&hit{%p(%v),%p(%v),%p(%v)}", self.leftRef, self.leftNode.val(), self.ref, self.node.val(), self.rightRef, self.rightNode.val())
+	return fmt.Sprintf("&hit{%v,%v,%v}", self.left.val(), self.node.val(), self.right.val())
 }
 
 type Comparable interface {
@@ -25,10 +22,58 @@ type Comparable interface {
 
 type Thing interface{}
 
+type List struct {
+	*node
+	size int64
+}
+func NewList() *List {
+	return &List{&node{}, 0}
+}
+func (self *List) Push(t Thing) {
+	self.node.add(t)
+	atomic.AddInt64(&self.size, 1)
+}
+func (self *List) Pop() Thing {
+	rval := self.node.remove()
+	atomic.AddInt64(&self.size, -1)
+	return rval
+}
+func (self *List) String() string {
+	return fmt.Sprint(self.ToSlice())
+}
+func (self *List) ToSlice() []Thing {
+	return self.node.next().ToSlice()
+}
+func (self *List) Search(c Comparable) Thing {
+	if hit := self.node.search(c); hit.node != nil {
+		return hit.node.val()
+	}
+	return nil
+}
+func (self *List) Size() int {
+	return int(atomic.LoadInt64(&self.size))
+}
+func (self *List) Inject(c Comparable) {
+	self.node.inject(c)
+	atomic.AddInt64(&self.size, 1)
+}
+
+
 type node struct {
+	unsafe.Pointer
 	value Thing
-	next *nodeRef
 	deleted bool
+}
+func (self *node) next() *node {
+	current := (*node)(self.Pointer)
+	nextOk := current
+	for nextOk != nil && nextOk.deleted {
+		nextOk = nextOk.next()
+	}
+	if current != nextOk {
+		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(nextOk))
+	}
+	return nextOk
 }
 func (self *node) val() Thing {
 	if self == nil {
@@ -37,123 +82,104 @@ func (self *node) val() Thing {
 	return self.value
 }
 func (self *node) String() string {
+	return fmt.Sprint(self.ToSlice())
+}
+func (self *node) Describe() string {
 	deleted := ""
 	if self.deleted {
 		deleted = " (x)"
 	}
-	return fmt.Sprintf("%v%v -> %v", self.value, deleted, self.next)
+	return fmt.Sprintf("%v%v -> %v", self.value, deleted, self.next())
 }
-
-type List struct {
-	*nodeRef
-	size int64
+func (self *node) add(c Thing) {
+	n := &node{}
+	for !self.addBefore(c, n, self.next()) {}
 }
-func NewList() *List {
-	return &List{new(nodeRef), 0}
-}
-func (self *List) Push(t Thing) {
-	self.nodeRef.push(t)
-	atomic.AddInt64(&self.size, 1)
-}
-func (self *List) Pop() Thing {
-	atomic.AddInt64(&self.size, -1)
-	return self.nodeRef.pop()
-}
-func (self *List) String() string {
-	return fmt.Sprint(self.nodeRef.ToSlice())
-}
-func (self *List) Search(c Comparable) Thing {
-	if hit := self.nodeRef.search(c); hit.node != nil {
-		return hit.node.value
-	}
-	return nil
-}
-func (self *List) Size() int {
-	return int(atomic.LoadInt64(&self.size))
-}
-func (self *List) Inject(c Comparable) {
-	self.nodeRef.inject(c)
-	atomic.AddInt64(&self.size, 1)
-}
-
-type nodeRef struct {
-	unsafe.Pointer
-}
-func (self *nodeRef) node() *node {
-	current := (*node)(self.Pointer)
-	next_ok := current
-	for next_ok != nil && next_ok.deleted {
-		next_ok = next_ok.next.node()
-	}
-	if current != next_ok {
-		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(next_ok))
-	}
-	return next_ok
-}
-func (self *nodeRef) ToSlice() []Thing {
-	rval := make([]Thing, 0)
-	current := self.node()
-	for current != nil {
-		rval = append(rval, current.value)
-		current = current.next.node()
-	}
-	return rval
-}
-func (self *nodeRef) pushBefore(t Thing, allocatedRef *nodeRef, allocatedNode, n *node) bool {
-	if self.node() != n {
+func (self *node) addBefore(t Thing, allocatedNode, before *node) bool {
+	if self.next() != before {
 		return false
 	}
-	allocatedRef.Pointer = unsafe.Pointer(n)
 	allocatedNode.value = t
-	allocatedNode.next = allocatedRef
+	allocatedNode.Pointer = unsafe.Pointer(before)
 	allocatedNode.deleted = false
-	return atomic.CompareAndSwapPointer(&self.Pointer, allocatedNode.next.Pointer, unsafe.Pointer(allocatedNode))
-}
-func (self *nodeRef) push(c Thing) {
-	ref := &nodeRef{}
-	node := &node{}
-	for !self.pushBefore(c, ref, node, self.node()) {}
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(before), unsafe.Pointer(allocatedNode))
 }
 /*
  * inject c into self either before the first matching value (c.Compare(value) == 0), before the first value
  * it should be before (c.Compare(value) < 0) or after the first value it should be after (c.Compare(value) > 0).
  */
-func (self *nodeRef) inject(c Comparable) {
-	ref := &nodeRef{}
+func (self *node) inject(c Comparable) {
 	node := &node{}
 	for {
 		hit := self.search(c)
-		if hit.ref != nil {
-			if hit.ref.pushBefore(c, ref, node, hit.node) { break }
-		} else if hit.rightRef != nil {
-			if hit.rightRef.pushBefore(c, ref, node, hit.rightNode) { break }
-		} else if hit.leftRef != nil {
-			if hit.leftNode.next.pushBefore(c, ref, node, hit.rightNode) { break }
+		if hit.left != nil {
+			if hit.node != nil {
+				if hit.left.addBefore(c, node, hit.node) { break }
+			} else {
+				if hit.left.addBefore(c, node, hit.right) { break }
+			}
+		} else if hit.node != nil {
+			if hit.node.addBefore(c, node, hit.right) { break }
 		} else {
-			panic(fmt.Sprintf("Expected some kind of result from %#v.search(%v), but got %+v", self, c, hit))
+			panic(fmt.Errorf("Unable to inject %v properly into %v, it ought to be first but was injected into the first node of the list!", c, self))
 		}
 	}
+}
+func (self *node) ToSlice() []Thing {
+	rval := make([]Thing, 0)
+	current := self
+	for current != nil {
+		rval = append(rval, current.value)
+		current = current.next()
+	}
+	return rval
+}
+/*
+ * search for c in self.
+ *
+ * Will stop searching when finding nil or an element that should be after c (c.Compare(element) < 0).
+ *
+ * Will return a hit containing the last nodeRef and node before a match (if no match, the last nodeRef and node before
+ * it stops searching), the nodeRef and node for the match (if a match) and the last nodeRef and node after the match
+ * (if no match, the first nodeRef and node, or nil/nil if at the end of the list).
+ */
+func (self *node) search(c Comparable) (rval *hit) {
+	rval = &hit{nil, self, nil}
+	for {
+		if rval.node == nil {
+			return
+		}
+		rval.right = rval.node.next()
+		switch cmp := c.Compare(rval.node.value); {
+		case cmp < 0:
+			rval.right = rval.node
+			rval.node = nil
+			return
+		case cmp == 0:
+			return
+		}
+		rval.left = rval.node
+		rval.node = rval.left.next()
+		rval.right = nil
+	}
+	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
 }
 /*
  * Verify that all Comparable values in this list are after values they should be after (c.Compare(last) >= 0).
  */
-func (self *nodeRef) verify() error {
-	node := self.node()
-	if node == nil {
-		return nil
-	}
-	last := node.val()
-	node = node.next.node()
+func (self *node) verify() (err error) {
+	current := self
+	var last Thing
 	var bad [][]Thing
-	for node != nil {
-		value := node.val()
+	for current != nil {
+		value := current.value
 		if comp, ok := value.(Comparable); ok {
 			if comp.Compare(last) < 0 {
 				bad = append(bad, []Thing{last,value})
 			}
 		}
-		last = node.val()
-		node = node.next.node()
+		last = value
+		current = current.next()
 	}
 	if len(bad) == 0 {
 		return nil
@@ -168,66 +194,27 @@ func (self *nodeRef) verify() error {
 	return fmt.Errorf("%v is badly ordered. The following nodes are in the wrong order: %v", self, string(buffer.Bytes()));
 	
 }
-/*
- * search for c in self.
- *
- * Will stop searching when finding nil or an element that should be after c (c.Compare(element) < 0).
- *
- * Will return a hit containing the last nodeRef and node before a match (if no match, the last nodeRef and node before
- * it stops searching), the nodeRef and node for the match (if a match) and the last nodeRef and node after the match
- * (if no match, the first nodeRef and node, or nil/nil if at the end of the list).
- */
-func (self *nodeRef) search(c Comparable) (rval *hit) {
-	rval = &hit{nil, nil, self, self.node(), nil, nil}
-	for {
-		if rval.node == nil {
-			return
-		}
-		rval.rightRef = rval.node.next
-		rval.rightNode = rval.rightRef.node()
-		switch cmp := c.Compare(rval.node.value); {
-		case cmp < 0:
-			rval.rightRef = rval.ref
-			rval.rightNode = rval.node
-			rval.ref = nil
-			rval.node = nil
-			return
-		case cmp == 0:
-			return
-		}
-		rval.leftRef = rval.ref
-		rval.leftNode = rval.leftRef.node()
-		rval.ref = rval.leftNode.next
-		rval.node = rval.ref.node()
-		rval.rightRef = nil
-		rval.rightNode = nil
-	}
-	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
-}
-func (self *nodeRef) popExact(deleted_node, old_node *node) bool {
-	if old_node == nil {
+func (self *node) removeExact(allocatedNode, oldNode *node) bool {
+	if oldNode == nil {
 		return true
 	}
-	deleted_node.value = old_node.value
-	deleted_node.next = old_node.next
-	deleted_node.deleted = true
-	if atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old_node), unsafe.Pointer(deleted_node)) {
-		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(deleted_node), deleted_node.next.Pointer)
+	allocatedNode.value = oldNode.value
+	allocatedNode.Pointer = oldNode.Pointer
+	allocatedNode.deleted = true
+	if atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(oldNode), unsafe.Pointer(allocatedNode)) {
+		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(allocatedNode), allocatedNode.Pointer)
 		return true
 	}
 	return false
 }
-func (self *nodeRef) pop() Thing {
-	n := self.node()
+func (self *node) remove() Thing {
 	alloc := &node{}
-	for !self.popExact(alloc, n) {
-		n = self.node()
+	n := self.next()
+	for !self.removeExact(alloc, n) {
+		n = self.next()
 	}
 	if n != nil {
 		return n.value
 	}
 	return nil
-}
-func (self *nodeRef) String() string {
-	return fmt.Sprint(self.node())
 }

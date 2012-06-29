@@ -13,19 +13,19 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func fiddle(nr *nodeRef, do, done chan bool) {
+func fiddle(nr *node, do, done chan bool) {
 	<- do
 	num := 10000
 	for i := 0; i < num; i++ {
-		nr.push(rand.Int())
+		nr.add(rand.Int())
 	}
 	for i := 0; i < num; i++ {
-		nr.pop()
+		nr.remove()
 	}
 	done <- true
 }
 
-func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
+func fiddleAndAssertSort(t *testing.T, nr *node, do, done chan bool) {
 	<- do
 	num := 1000
 	for i := 0; i < num; i++ {
@@ -35,7 +35,7 @@ func fiddleAndAssertSort(t *testing.T, nr *nodeRef, do, done chan bool) {
 		}
 	}
 	for i := 0; i < num; i++ {
-		nr.pop()
+		nr.remove()
 	}
 	done <- true
 }
@@ -73,14 +73,14 @@ func TestList(t *testing.T) {
 	assertListy(t, l, []Thing{"blar", "hehu","knap","plur"})
 }
 
-func assertSlicey(t *testing.T, nr *nodeRef, cmp []Thing) {
+func assertSlicey(t *testing.T, nr *node, cmp []Thing) {
 	if sl := nr.ToSlice(); !reflect.DeepEqual(sl, cmp) {
 		t.Errorf("%v should be %#v but is %#v", nr, cmp, sl)
 	}
 }
 
-func assertPop(t *testing.T, nr *nodeRef, th Thing) {
-	p := nr.pop()
+func assertPop(t *testing.T, nr *node, th Thing) {
+	p := nr.remove()
 	if !reflect.DeepEqual(p, th) {
 		t.Error(nr, " should pop ", th, " but popped ", p)
 	}
@@ -88,26 +88,26 @@ func assertPop(t *testing.T, nr *nodeRef, th Thing) {
 
 func TestPushPop(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(nodeRef)
-	assertSlicey(t, nr, []Thing{})
-	nr.push("hej")
-	assertSlicey(t, nr, []Thing{"hej"})
-	nr.push("haj")
-	assertSlicey(t, nr, []Thing{"haj","hej"})
-	nr.push("hoj")
-	assertSlicey(t, nr, []Thing{"hoj","haj","hej"})
+	nr := new(node)
+	assertSlicey(t, nr, []Thing{nil})
+	nr.add("hej")
+	assertSlicey(t, nr, []Thing{nil,"hej"})
+	nr.add("haj")
+	assertSlicey(t, nr, []Thing{nil,"haj","hej"})
+	nr.add("hoj")
+	assertSlicey(t, nr, []Thing{nil,"hoj","haj","hej"})
 	assertPop(t, nr, "hoj")
-	assertSlicey(t, nr, []Thing{"haj","hej"})
+	assertSlicey(t, nr, []Thing{nil,"haj","hej"})
 	assertPop(t, nr, "haj")
-	assertSlicey(t, nr, []Thing{"hej"})
+	assertSlicey(t, nr, []Thing{nil,"hej"})
 	assertPop(t, nr, "hej")
-	assertSlicey(t, nr, []Thing{})
+	assertSlicey(t, nr, []Thing{nil})
 	assertPop(t, nr, nil)
-	assertSlicey(t, nr, []Thing{})
-	nr.push("1")
-	nr.push("2")
-	nr.push("3")
-	nr.push("4")
+	assertSlicey(t, nr, []Thing{nil})
+	nr.add("1")
+	nr.add("2")
+	nr.add("3")
+	nr.add("4")
 	do := make(chan bool)
 	done := make(chan bool)
 	go fiddle(nr, do, done)
@@ -119,7 +119,7 @@ func TestPushPop(t *testing.T) {
 	<-done
 	<-done
 	<-done
-	assertSlicey(t, nr, []Thing{"4","3","2","1"})
+	assertSlicey(t, nr, []Thing{nil,"4","3","2","1"})
 }
 
 type c int
@@ -138,61 +138,85 @@ func (self c) Compare(t Thing) int {
 			return -1
 		}
 	}
+	if t == nil {
+		return 1
+	}
 	return 0
 }
 
 const ANY = "ANY VALUE"
 
-func searchTest(t *testing.T, nr *nodeRef, s c, l, n, r Thing) {
+func searchTest(t *testing.T, nr *node, s c, l, n, r Thing) {
 	h := nr.search(s)
-	if (l != ANY && !reflect.DeepEqual(h.leftNode.val(), l)) || 
+	if (l != ANY && !reflect.DeepEqual(h.left.val(), l)) || 
 		(n != ANY && !reflect.DeepEqual(h.node.val(), n)) || 
-		(r != ANY && !reflect.DeepEqual(h.rightNode.val(), r)) {
-		t.Error(nr, ".search(", s, ") should produce ", r, n, l, " but produced ", h.leftNode.val(), h.node.val(), h.rightNode.val())
+		(r != ANY && !reflect.DeepEqual(h.right.val(), r)) {
+		t.Error(nr, ".search(", s, ") should produce ", l, n, r, " but produced ", h.left.val(), h.node.val(), h.right.val())
 	}
 }
 
 func TestPushBefore(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(nodeRef)
-	nr.push("h")
-	nr.push("g")
-	nr.push("f")
-	nr.push("d")
-	nr.push("c")
-	nr.push("b")
-	ref := &nodeRef{}
+	nr := new(node)
+	nr.add("h")
+	nr.add("g")
+	nr.add("f")
+	nr.add("d")
+	nr.add("c")
+	nr.add("b")
 	node := &node{}
-	if nr.pushBefore("a", ref, node, nr.node().next.node()) {
+	if nr.addBefore("a", node, nr) {
 		t.Error("should not be possible")
 	}
-	if !nr.pushBefore("a", ref, node, nr.node()) {
+	if !nr.addBefore("a", node, nr.next()) {
 		t.Error("should be possible")
 	}
 }
 
+func TestSearch(t *testing.T) {
+	nr := new(node)
+	nr.add(c(9))
+	nr.add(c(8))
+	nr.add(c(7))
+	nr.add(c(5))
+	nr.add(c(4))
+	nr.add(c(3))
+	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
+	searchTest(t, nr, c(1), nil, nil, c(3))
+	searchTest(t, nr, c(2), nil, nil, c(3))
+	searchTest(t, nr, c(3), nil, c(3), c(4))
+	searchTest(t, nr, c(4), c(3), c(4), c(5))
+	searchTest(t, nr, c(5), c(4), c(5), c(7))
+	searchTest(t, nr, c(6), c(5), nil, c(7))
+	searchTest(t, nr, c(7), c(5), c(7), c(8))
+	searchTest(t, nr, c(8), c(7), c(8), c(9))
+	searchTest(t, nr, c(9), c(8), c(9), nil)
+	searchTest(t, nr, c(10), c(9), nil, nil)
+	searchTest(t, nr, c(11), c(9), nil, nil)
+}
+
 func TestVerify(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(nodeRef)
+	nr := new(node)
 	nr.inject(c(3))
 	nr.inject(c(5))
 	nr.inject(c(9))
 	nr.inject(c(7))
 	nr.inject(c(4))
 	nr.inject(c(8))
-	assertSlicey(t, nr, []Thing{c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
 	if err := nr.verify(); err != nil {
 		t.Error(nr, "should verify as ok, got", err)
 	}
-	nr = new(nodeRef)
-	nr.push(c(3))
-	nr.push(c(5))
-	nr.push(c(9))
-	nr.push(c(7))
-	nr.push(c(4))
-	nr.push(c(8))
-	assertSlicey(t, nr, []Thing{c(8),c(4),c(7),c(9),c(5),c(3)})
-	s := "8 -> 4 -> 7 -> 9 -> 5 -> 3 -> <nil> is badly ordered. The following nodes are in the wrong order: 8,4; 9,5; 5,3"
+	nr = new(node)
+	nr.add(c(3))
+	nr.add(c(5))
+	nr.add(c(9))
+	nr.add(c(7))
+	nr.add(c(4))
+	nr.add(c(8))
+	assertSlicey(t, nr, []Thing{nil, c(8),c(4),c(7),c(9),c(5),c(3)})
+	s := "[<nil> 8 4 7 9 5 3] is badly ordered. The following nodes are in the wrong order: 8,4; 9,5; 5,3"
 	if err := nr.verify(); err.Error() != s {
 		t.Error(nr, "should have errors", s, "but had", err)
 	}
@@ -200,14 +224,14 @@ func TestVerify(t *testing.T) {
 
 func TestInjectAndSearch(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(nodeRef)
+	nr := new(node)
 	nr.inject(c(3))
 	nr.inject(c(5))
 	nr.inject(c(9))
 	nr.inject(c(7))
 	nr.inject(c(4))
 	nr.inject(c(8))
-	assertSlicey(t, nr, []Thing{c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
 	searchTest(t, nr, c(1), nil, nil, c(3))
 	searchTest(t, nr, c(2), nil, nil, c(3))
 	searchTest(t, nr, c(3), nil, c(3), c(4))
@@ -240,5 +264,5 @@ func TestInjectAndSearch(t *testing.T) {
 		searchTest(t, nr, c(11), c(9), nil, nil)
 		<-done
 	}
-	assertSlicey(t, nr, []Thing{c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{nil, c(3),c(4),c(5),c(7),c(8),c(9)})
 }
