@@ -32,7 +32,7 @@ c)
     BenchmarkHash	 1000000	      4182 ns/op
     BenchmarkHashConc	  500000	      7289 ns/op
 
-Notice that as expected a) is by far the fastest mapping, but if you want a thread safe mapping (and yeah, _Don't communicate by sharing memory; share memory by communicating_, but sometimes it really is easier to have a global mapping) the Non-Blocking mapping is more than ten times faster than the `channel`-wrapped native `map`.
+Notice that as expected a) is by far the fastest mapping, but if you want a thread safe mapping (and yeah, _Don't communicate by sharing memory; share memory by communicating_, but sometimes it really is easier to have a global mapping) the Non-Blocking mapping is more than seven times faster than the `channel`-wrapped native `map`.
 
 ## Usage
 
