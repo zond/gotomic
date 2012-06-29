@@ -12,7 +12,7 @@ The `Hash` type is implemented using [Split-Ordered Lists: Lock-Free Extensible 
 
 On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types wrapped by a `channel` and `goroutine`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
 
-The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L82 and the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L119.
+The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L82 and the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L107.
 
 The TL;DR of it all is that the benchmark sets `runtime.GOMAXPROCS` to be `runtime.NumCPU()`, and starts that number `goroutine`s that just mutates and reads the tested mapping.
 
