@@ -16,6 +16,12 @@ func (self *hit) String() string {
 	return fmt.Sprintf("&hit{%v,%v,%v}", self.left.val(), self.node.val(), self.right.val())
 }
 
+/*
+ * Comparable types can be kept sorted in a List.
+ * 
+ * Note that everything has to compare as greater than nil, due to implementation 
+ * specifics in List :/
+ */
 type Comparable interface {
 	Compare(Thing) int
 }
