@@ -303,7 +303,7 @@ func TestConcInjectAndSearch(t *testing.T) {
 				t.Errorf("fiddlers injected %v of %v but removed %v", num, val, num2)
 			}
 		} else {
-			t.Errorf("fiddlers injected %v of %v but removed none")
+			t.Errorf("fiddlers injected %v of %v but removed none", num, val)
 		}
 	}
 }
