@@ -106,7 +106,20 @@ func (self *Hash) Verify() error {
 	if e := bucket.verify(); e != nil {
 		return e
 	}
-	// TODO fix more verification NAO!
+	buckets := self.Buckets()
+	for bucket != nil {
+		if hashCode, ok := buckets[bucket]; ok {
+			e := bucket.value.(*entry)
+			if hashCode != e.hashCode {
+				return fmt.Errorf("%v has %v that should be in bucket %v but is in bucket %v", self, e, e.hashCode, hashCode)
+			}
+			delete(buckets, bucket)
+		}
+		bucket = bucket.next()
+	}
+	if len(buckets) > 0 {
+		return fmt.Errorf("%v has %v that are not represented in the backing list %v", self, buckets, self.getBucketByHashCode(0))
+	}
 	return nil
 }
 func (self *Hash) ToMap() map[Hashable]Thing {
