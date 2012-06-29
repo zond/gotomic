@@ -65,15 +65,12 @@ type node struct {
 	deleted bool
 }
 func (self *node) next() *node {
-	current := (*node)(self.Pointer)
-	nextOk := current
-	for nextOk != nil && nextOk.deleted {
-		nextOk = nextOk.next()
+	current := (*node)(atomic.LoadPointer(&self.Pointer))
+	for current != nil && current.deleted {
+		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), current.Pointer)		
+		current = (*node)(atomic.LoadPointer(&self.Pointer))
 	}
-	if current != nextOk {
-		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(nextOk))
-	}
-	return nextOk
+	return current
 }
 func (self *node) val() Thing {
 	if self == nil {
@@ -89,11 +86,11 @@ func (self *node) Describe() string {
 	if self.deleted {
 		deleted = " (x)"
 	}
-	return fmt.Sprintf("%v%v -> %v", self.value, deleted, self.next())
+	return fmt.Sprintf("%#v -> %#v", self.value, deleted, self.next())
 }
 func (self *node) add(c Thing) {
-	n := &node{}
-	for !self.addBefore(c, n, self.next()) {}
+	alloc := &node{}
+	for !self.addBefore(c, alloc, self.next()) {}
 }
 func (self *node) addBefore(t Thing, allocatedNode, before *node) bool {
 	if self.next() != before {
@@ -109,17 +106,17 @@ func (self *node) addBefore(t Thing, allocatedNode, before *node) bool {
  * it should be before (c.Compare(value) < 0) or after the first value it should be after (c.Compare(value) > 0).
  */
 func (self *node) inject(c Comparable) {
-	node := &node{}
+	alloc := &node{}
 	for {
 		hit := self.search(c)
 		if hit.left != nil {
 			if hit.node != nil {
-				if hit.left.addBefore(c, node, hit.node) { break }
+				if hit.left.addBefore(c, alloc, hit.node) { break }
 			} else {
-				if hit.left.addBefore(c, node, hit.right) { break }
+				if hit.left.addBefore(c, alloc, hit.right) { break }
 			}
 		} else if hit.node != nil {
-			if hit.node.addBefore(c, node, hit.right) { break }
+			if hit.node.addBefore(c, alloc, hit.right) { break }
 		} else {
 			panic(fmt.Errorf("Unable to inject %v properly into %v, it ought to be first but was injected into the first node of the list!", c, self))
 		}

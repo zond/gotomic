@@ -53,39 +53,41 @@ func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
 	for i := 0; i < n; i++ {
 		k := key(fmt.Sprint(s, rand.Int()))
 		v := fmt.Sprint(k, "value")
-		h.Put(k, v)
+		if hv := h.Put(k, v); hv != nil {
+			t.Errorf("1 Put(%v, %v) should produce nil but produced %v", k, v, hv)
+		}
 		cmp[k] = v
 	}
 	for k, v := range cmp {
 		if hv, _ := h.Get(k); !reflect.DeepEqual(hv, v) {
-			t.Errorf("Get(%v) should produce %v but produced %v", k, v, hv)
+			t.Errorf("1 Get(%v) should produce %v but produced %v", k, v, hv)
 		}
 	}
 	for k, v := range cmp {
 		v2 := fmt.Sprint(v, ".2")
 		cmp[k] = v2
 		if hv := h.Put(k, v2); !reflect.DeepEqual(hv, v) {
-			t.Errorf("Get(%v) should produce %v but produced %v", k, v, hv)
+			t.Errorf("2 Put(%v, %v) should produce %v but produced %v", k, v2, v, hv)
 		}
 	}
 	for k, v := range cmp {
 		if hv, _ := h.Get(k); !reflect.DeepEqual(hv, v) {
-			t.Errorf("Get(%v) should produce %v but produced %v", k, v, hv)
+			t.Errorf("2 Get(%v) should produce %v but produced %v", k, v, hv)
 		}
 	}
 	for k, v := range cmp {
 		if hv := h.Delete(k); !reflect.DeepEqual(hv, v) {
-			t.Errorf("Delete(%v) should produce %v but produced %v", k, v, hv)
+			t.Errorf("1 Delete(%v) should produce %v but produced %v", k, v, hv)
 		}
 	}
 	for k, _ := range cmp {
 		if hv := h.Delete(k); hv != nil {
-			t.Errorf("Delete(%v) should produce nil but produced %v", k, hv)
+			t.Errorf("2 Delete(%v) should produce nil but produced %v", k, hv)
 		}
 	}
 	for k, _ := range cmp {
 		if hv, _ := h.Get(k); hv != nil {
-			t.Errorf("Get(%v) should produce nil but produced %v", k, hv)
+			t.Errorf("3 Get(%v) should produce nil but produced %v", k, hv)
 		}
 	}
 	done <- true
@@ -157,15 +159,13 @@ func TestConcurrency(t *testing.T) {
 	assertMappy(t, h, cmp)
 	do := make(chan bool)
 	done := make(chan bool)
-	go fiddleHash(t, h, "fiddlerA", do, done)
-	go fiddleHash(t, h, "fiddlerB", do, done)
-	go fiddleHash(t, h, "fiddlerC", do, done)
-	go fiddleHash(t, h, "fiddlerD", do, done)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go fiddleHash(t, h, "fiddlerA", do, done)
+	}
 	close(do)
-	<- done
-	<- done
-	<- done
-	<- done
+	for i := 0; i < runtime.NumCPU(); i++ {
+		<- done
+	}
 	assertMappy(t, h, cmp)
 }
 
