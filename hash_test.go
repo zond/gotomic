@@ -126,6 +126,19 @@ func action(b *testing.B, m *Hash, i int, do, done chan bool) {
 	done <- true
 }
 
+func TestPutIfMissing(t *testing.T) {
+	h := NewHash()
+	assertMappy(t, h, map[Hashable]Thing{})
+	if !h.PutIfMissing(key("k"), "v") {
+		t.Error(h, "should not contain 'k'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): "v"})
+	if h.PutIfMissing(key("k"), "v") {
+		t.Error(h, "should contain 'k'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): "v"})
+}
+
 func BenchmarkHashConc(b *testing.B) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	do := make(chan bool)

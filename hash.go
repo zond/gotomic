@@ -213,6 +213,26 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 	return
 }
 /*
+ * PutIfMissing will insert v under k if k was missing from the Hash, and return whether it inserted anything.
+ */
+func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
+	newEntry := newRealEntry(k, v)
+	alloc := &node{}
+	for {
+		bucket := self.getBucketByHashCode(newEntry.hashCode)
+		hit := (*hashHit)(bucket.search(newEntry))
+		if hit2 := hit.search(newEntry); hit2.node == nil {
+			if hit2.left.addBefore(newEntry, alloc, hit2.right) {
+				self.addSize(1)
+				return true
+			}
+		} else {
+			return false
+		}
+	}
+	return false
+}
+/*
  * Put k and v in the Hash and return any overwritten value.
  */
 func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
