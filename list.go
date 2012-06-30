@@ -86,7 +86,9 @@ func (self *List) Inject(c Comparable) {
 }
 
 
-
+/*
+* Note that if the pointer has the deleted flag set, it is the node containing the pointer that is deleted!
+ */
 func isDeleted(p unsafe.Pointer) bool {
 	return uintptr(p) & 1 == 1
 }
@@ -98,20 +100,41 @@ func normal(p unsafe.Pointer) unsafe.Pointer {
 }
 
 type node struct {
+	/*
+	 * The next node in the list. If this pointer has the deleted flag set it means THIS node, not the next one, is deleted.
+	 */
 	unsafe.Pointer
 	value Thing
 }
 func (self *node) next() *node {
 	next := atomic.LoadPointer(&self.Pointer)
 	for next != nil {
+		/*
+		 * If the pointer of the next node is marked as deleted, that means the next node is supposed to be GONE
+		 */
 		if nextPointer := atomic.LoadPointer(&(*node)(normal(next)).Pointer); isDeleted(nextPointer) {
+			/*
+			* If OUR pointer is marked as deleted, that means WE are supposed to be gone
+			 */
 			if isDeleted(next) {
+				/*
+				 * .. which means that we can steal the pointer of the next node right away,
+				 * it points to the right place AND it is marked as deleted.
+				 */
 				atomic.CompareAndSwapPointer(&self.Pointer, next, nextPointer)
 			} else {
+				/*
+				 * .. if not, we have to remove the marking on the pointer before we steal it.
+				 */
 				atomic.CompareAndSwapPointer(&self.Pointer, next, normal(nextPointer))
 			}
 			next = atomic.LoadPointer(&self.Pointer)
 		} else {
+			/*
+			 * If the next node is NOT deleted, then we simply return a pointer to it, and make
+			 * damn sure that the pointer is a working one even if we are deleted (and, therefore,
+			 * our pointer is marked as deleted).
+			 */
 			return (*node)(normal(next))
 		}
 	}
