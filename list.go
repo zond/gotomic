@@ -18,15 +18,14 @@ func (self *hit) String() string {
 
 /*
  * Comparable types can be kept sorted in a List.
- * 
- * Note that everything has to compare as greater than nil, due to implementation 
- * specifics in List :/
  */
 type Comparable interface {
 	Compare(Thing) int
 }
 
 type Thing interface{}
+
+var list_head = "LIST_HEAD"
 
 /*
  * List is a singly linked list based on "A Pragmatic Implementation of Non-Blocking Linked-Lists" by Timothy L. Harris <http://www.timharris.co.uk/papers/2001-disc.pdf>
@@ -38,7 +37,7 @@ type List struct {
 	size int64
 }
 func NewList() *List {
-	return &List{&node{}, 0}
+	return &List{&node{nil, &list_head}, 0}
 }
 /*
  * Push adds t to the top of the List.
@@ -101,15 +100,12 @@ type node struct {
 	value Thing
 }
 func (self *node) next() *node {
-	current := (*node)(self.Pointer)
-	nextOk := current
-	for nextOk != nil && isDeleted(nextOk) {
-		nextOk = (*node)(normal(nextOk).Pointer)
+	current := (*node)(atomic.LoadPointer(&self.Pointer))
+	for current != nil && isDeleted(current) {
+		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(normal(current).next()))
+		current = (*node)(atomic.LoadPointer(&self.Pointer))
 	}
-	if nextOk != current {
-		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(nextOk))
-	}
-	return nextOk
+	return current
 }
 func (self *node) val() Thing {
 	if self == nil {
@@ -181,13 +177,15 @@ func (self *node) search(c Comparable) (rval *hit) {
 			return
 		}
 		rval.right = rval.node.next()
-		switch cmp := c.Compare(rval.node.value); {
-		case cmp < 0:
-			rval.right = rval.node
-			rval.node = nil
-			return
-		case cmp == 0:
-			return
+		if rval.node.value != &list_head {
+			switch cmp := c.Compare(rval.node.value); {
+			case cmp < 0:
+				rval.right = rval.node
+				rval.node = nil
+				return
+			case cmp == 0:
+				return
+			}
 		}
 		rval.left = rval.node
 		rval.node = rval.left.next()
