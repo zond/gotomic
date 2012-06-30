@@ -46,12 +46,11 @@ func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
 func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
 	<- do
 	cmp := make(map[Hashable]Thing)
-	n := 10000
+	n := 100000
 	for i := 0; i < n; i++ {
-		k := key(fmt.Sprint(s, rand.Int()))
+		k := key(fmt.Sprint(s, i))
 		v := fmt.Sprint(k, "value")
 		if hv := h.Put(k, v); hv != nil {
-			fmt.Println(h.Describe())
 			t.Errorf("1 Put(%v, %v) should produce nil but produced %v", k, v, hv)
 		}
 		cmp[k] = v
@@ -158,7 +157,7 @@ func TestConcurrency(t *testing.T) {
 	do := make(chan bool)
 	done := make(chan bool)
 	for i := 0; i < runtime.NumCPU(); i++ {
-		go fiddleHash(t, h, "fiddlerA", do, done)
+		go fiddleHash(t, h, fmt.Sprint("fiddler-", i, "-"), do, done)
 	}
 	close(do)
 	for i := 0; i < runtime.NumCPU(); i++ {
