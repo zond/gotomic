@@ -126,6 +126,23 @@ func action(b *testing.B, m *Hash, i int, do, done chan bool) {
 	done <- true
 }
 
+func BenchmarkHashConc(b *testing.B) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	do := make(chan bool)
+	done := make(chan bool)
+	m := NewHash()
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go action(b, m, b.N, do, done)
+	}
+	close(do)
+	b.StartTimer()
+	for i := 0; i < runtime.NumCPU(); i++ {
+		<- done
+	}
+	b.StopTimer()
+	runtime.GOMAXPROCS(1)
+}
+
 func TestPutIfPresent(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
@@ -166,23 +183,6 @@ func TestPutIfMissing(t *testing.T) {
 		t.Error(h, "should contain 'k'")
 	}
 	assertMappy(t, h, map[Hashable]Thing{key("k"): "v"})
-}
-
-func BenchmarkHashConc(b *testing.B) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	do := make(chan bool)
-	done := make(chan bool)
-	m := NewHash()
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go action(b, m, b.N, do, done)
-	}
-	close(do)
-	b.StartTimer()
-	for i := 0; i < runtime.NumCPU(); i++ {
-		<- done
-	}
-	b.StopTimer()
-	runtime.GOMAXPROCS(1)
 }
 
 func TestConcurrency(t *testing.T) {
