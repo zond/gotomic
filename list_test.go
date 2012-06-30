@@ -306,4 +306,13 @@ func TestConcInjectAndSearch(t *testing.T) {
 			t.Errorf("fiddlers injected %v of %v but removed none", num, val)
 		}
 	}
+	for val, num := range rmap {
+		if num2, ok := imap[val]; ok {
+			if num2 != num {
+				t.Errorf("fiddlers removed %v of %v but injected %v", num, val, num2)
+			}
+		} else {
+			t.Errorf("fiddlers removed %v of %v but injected none", num, val)
+		}
+	}
 }
