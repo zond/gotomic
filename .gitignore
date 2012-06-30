@@ -22,5 +22,5 @@ _testmain.go
 *.exe
 *~
 examples/cpuprofile
-examples/benchmark
+examples/profile
 examples/memprofile

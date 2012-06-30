@@ -90,7 +90,10 @@ func (self *entry) Compare(t Thing) int {
 /*
  * Hash is a hash table based on "Split-Ordered Lists: Lock-Free Extensible Hash Tables" by Ori Shalev and Nir Shavit <http://www.cs.ucf.edu/~dcm/Teaching/COT4810-Spring2011/Literature/SplitOrderedLists.pdf>.
  *
- * The short story is that it creates a linked list containing all hashed entries, and a cleverly extensible table of 'shortcuts' into said list.
+ * TL;DR: It creates a linked list containing all hashed entries, and an extensible table of 'shortcuts' into said list. To enable future extensions to the shortcut table, the list is ordered in reversed bit order so that new table entries point into finer and finer sections of the potential address space.
+ *
+ * To enable growing the table a two dimensional slice of unsafe.Pointers is used, where each consecutive slice is twice the size of the one before.
+ * This makes it simple to allocate exponentially more memory for the table with only a single extra indirection.
  */
 type Hash struct {
 	exponent uint32
