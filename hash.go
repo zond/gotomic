@@ -228,13 +228,13 @@ func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 			if hit2.left.addBefore(newEntry, alloc, hit2.right) {
 				self.addSize(1)
 				rval = nil
-				return
+				break
 			}
 		} else {
 			oldEntry := hit2.node.value.(*entry)
 			rval = oldEntry.val()
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
-			return
+			break
 		}
 	}
 	return

@@ -150,7 +150,7 @@ func TestConcurrency(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	h := NewHash()
 	cmp := make(map[Hashable]Thing)
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1000; i++ {
 		k := key(fmt.Sprint("key", i))
 		v := fmt.Sprint("value", i)
 		h.Put(k, v)
