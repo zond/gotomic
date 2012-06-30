@@ -36,7 +36,7 @@ Notice that as expected a) is by far the fastest mapping, but if you want a thre
 
 ## Usage
 
-See https://github.com/zond/gotomic/blob/master/examples/example.go or https://github.com/zond/gotomic/blob/master/examples/benchmark.go
+See https://github.com/zond/gotomic/blob/master/examples/example.go or https://github.com/zond/gotomic/blob/master/examples/profile.go
 
 ## Bugs
 
