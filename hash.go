@@ -4,7 +4,6 @@ package gotomic
 import (
 	"sync/atomic"
 	"bytes"
-	"math"
 	"unsafe"
 	"fmt"
 )
@@ -116,19 +115,18 @@ func (self *Hash) Verify() error {
 	if e := bucket.verify(); e != nil {
 		return e
 	}
-	buckets := self.bucketMap()
 	for bucket != nil {
-		if hashCode, ok := buckets[bucket]; ok {
-			e := bucket.value.(*entry)
-			if hashCode != e.hashCode {
-				return fmt.Errorf("%v has %v that should be in bucket %v but is in bucket %v", self, e, e.hashCode, hashCode)
+		e := bucket.value.(*entry)
+		if e.real() {
+			if ok, index, super, sub := self.isBucket(bucket); ok {
+				return fmt.Errorf("%v has %v that should not be a bucket but is bucket %v (%v, %v)", self, e, index, super, sub)
 			}
-			delete(buckets, bucket)
+		} else {
+			if ok, _,_,_ := self.isBucket(bucket); !ok {
+				return fmt.Errorf("%v has %v that should be a bucket but isn't", self, e)
+			}
 		}
 		bucket = bucket.next()
-	}
-	if len(buckets) > 0 {
-		return fmt.Errorf("%v has %v that are not represented in the backing list %v", self, buckets, self.getBucketByHashCode(0))
 	}
 	return nil
 }
@@ -146,18 +144,16 @@ func (self *Hash) ToMap() map[Hashable]Thing {
 	}
 	return rval
 }
-func (self *Hash) bucketMap() map[*node]uint32 {
-	buckets := make(map[*node]uint32)
-	for superIndex := 0; superIndex < int(self.exponent + 1); superIndex++ {
-		subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
-		for subIndex := 0; subIndex < len(subBucket); subIndex++ {
-			bucket := (*node)(subBucket[subIndex])
-			if bucket != nil {
-				buckets[bucket] = uint32(math.Pow(2, float64(superIndex - 1)) + float64(subIndex))
-			}
-		}
+func (self *Hash) isBucket(n *node) (isBucket bool, index, superIndex, subIndex uint32) {
+	e := n.value.(*entry)
+	index = e.hashCode & ((1 << self.exponent) - 1)	
+	superIndex, subIndex = self.getBucketIndices(index)
+	subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
+	if subBucket[subIndex] == unsafe.Pointer(n) {
+		isBucket = true
+		return
 	}
-	return buckets
+	return
 }
 /*
  * Describe returns a multi line description of the contents of the map for 
@@ -166,12 +162,10 @@ func (self *Hash) bucketMap() map[*node]uint32 {
 func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v maxload:%v}\n", self, self.size, self.exponent, self.loadFactor))
 	node := self.getBucketByIndex(0)
-	buckets := self.bucketMap()
 	for node != nil {
 		e := node.value.(*entry)
-		if id, ok := buckets[node]; ok {
-			super, sub := self.getBucketIndices(id)
-			fmt.Fprintf(buffer, "%3v:%3v,%3v: %v *\n", id, super, sub, e)
+		if ok, index, super, sub := self.isBucket(node); ok {
+			fmt.Fprintf(buffer, "%3v:%3v,%3v: %v *\n", index, super, sub, e)
 		} else {
 			fmt.Fprintf(buffer, "             %v\n", e)
 		}

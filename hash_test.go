@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"runtime"
 	"time"
+	"hash/crc32"
 )
 
 func init() {
@@ -15,11 +16,7 @@ func init() {
 
 type key string
 func (self key) HashCode() uint32 {
-	var sum uint32
-	for _, c := range string(self) {
-		sum += uint32(c)
-	}
-	return sum
+	return crc32.ChecksumIEEE([]byte(self))
 }
 func (self key) Equals(t Thing) bool {
 	if s, ok := t.(key); ok {
@@ -54,6 +51,7 @@ func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
 		k := key(fmt.Sprint(s, rand.Int()))
 		v := fmt.Sprint(k, "value")
 		if hv := h.Put(k, v); hv != nil {
+			fmt.Println(h.Describe())
 			t.Errorf("1 Put(%v, %v) should produce nil but produced %v", k, v, hv)
 		}
 		cmp[k] = v
