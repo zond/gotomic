@@ -101,17 +101,21 @@ type node struct {
 	unsafe.Pointer
 	value Thing
 }
-func (self *node) next() (next *node) {
-	next = (*node)(normal(self.Pointer))
+func (self *node) next() *node {
+	next := atomic.LoadPointer(&self.Pointer)
 	for next != nil {
-		if nextPointer := atomic.LoadPointer(&next.Pointer); isDeleted(nextPointer) {
-			atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(next), normal(nextPointer))
-			next = (*node)(normal(atomic.LoadPointer(&self.Pointer)))
+		if nextPointer := atomic.LoadPointer(&(*node)(normal(next)).Pointer); isDeleted(nextPointer) {
+			if isDeleted(next) {
+				atomic.CompareAndSwapPointer(&self.Pointer, next, nextPointer)
+			} else {
+				atomic.CompareAndSwapPointer(&self.Pointer, next, normal(nextPointer))
+			}
+			next = atomic.LoadPointer(&self.Pointer)
 		} else {
-			return next
+			return (*node)(normal(next))
 		}
 	}
-	return
+	return nil
 }
 func (self *node) val() Thing {
 	if self == nil {

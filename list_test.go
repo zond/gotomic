@@ -45,7 +45,7 @@ func fiddle(t *testing.T, nr *node, do, done chan bool) {
 
 func fiddleAndAssertSort(t *testing.T, nr *node, do chan bool, ichan, rchan chan []c) {
 	<- do
-	num := 10
+	num := 1000
 	var injected []c
 	var removed []c
 	for i := 0; i < num; i++ {
