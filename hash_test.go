@@ -126,6 +126,35 @@ func action(b *testing.B, m *Hash, i int, do, done chan bool) {
 	done <- true
 }
 
+func TestPutIfPresent(t *testing.T) {
+	h := NewHash()
+	assertMappy(t, h, map[Hashable]Thing{})
+	if h.PutIfPresent(key("k"), key("v"), key("blabla")) {
+		t.Error(h, "should not contain 'k': 'v'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{})
+	if h.Put(key("k"), key("v")) != nil {
+		t.Error(h, "should not contain 'k': 'v'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v")})
+	if h.PutIfPresent(key("k"), key("v3"), key("v2")) {
+		t.Error(h, "should not contain 'k': 'v2'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v")})
+	if !h.PutIfPresent(key("k"), key("v2"), key("v")) {
+		t.Error(h, "should contain 'k': 'v'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v2")})
+	if h.PutIfPresent(key("k"), key("v2"), key("v")) {
+		t.Error(h, "should not contain 'k': 'v'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v2")})
+	if !h.PutIfPresent(key("k"), key("v3"), key("v2")) {
+		t.Error(h, "should contain 'k': 'v2'")
+	}
+	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v3")})
+}
+
 func TestPutIfMissing(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})

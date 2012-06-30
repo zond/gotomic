@@ -38,11 +38,15 @@ func (self *hashHit) String() string {
 	return fmt.Sprint("&hashHit{", self.left.val(), self.node.val(), self.right.val(), "}")
 }
 
+type Equalable interface {
+	Equals(Thing) bool
+}
+
 /*
  * Hashable types can be in a Hash.
  */
 type Hashable interface {
-	Equals(Thing) bool
+	Equalable
 	HashCode() uint32
 }
 
@@ -211,6 +215,30 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 		}
 	}
 	return
+}
+/*
+ * PutIfMissing will insert v under k if k contains expected in the Hash, and return whether it inserted anything.
+ */
+func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) bool {
+	newEntry := newRealEntry(k, v)
+	for {
+		bucket := self.getBucketByHashCode(newEntry.hashCode)
+		hit := (*hashHit)(bucket.search(newEntry))
+		if hit2 := hit.search(newEntry); hit2.node == nil {
+			return false
+		} else {
+			oldEntry := hit2.node.value.(*entry)
+			oldValuePtr := atomic.LoadPointer(&oldEntry.value)
+			if expected.Equals(*(*Thing)(oldValuePtr)) {
+				if atomic.CompareAndSwapPointer(&oldEntry.value, oldValuePtr, unsafe.Pointer(newEntry.value)) {
+					return true
+				}
+			} else {
+				return false
+			}
+		}
+	}
+	return false
 }
 /*
  * PutIfMissing will insert v under k if k was missing from the Hash, and return whether it inserted anything.
