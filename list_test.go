@@ -28,21 +28,24 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func fiddle(nr *node, do, done chan bool) {
+func fiddle(t *testing.T, nr *node, do, done chan bool) {
 	<- do
 	num := 10000
 	for i := 0; i < num; i++ {
-		nr.add(rand.Int())
+		x := rand.Int()
+		nr.add(x)
 	}
 	for i := 0; i < num; i++ {
-		nr.remove()
+		if x := nr.remove(); x == nil {
+			t.Errorf("%v should pop something, but got nil")
+		}
 	}
 	done <- true
 }
 
 func fiddleAndAssertSort(t *testing.T, nr *node, do chan bool, ichan, rchan chan []c) {
 	<- do
-	num := 1000
+	num := 10
 	var injected []c
 	var removed []c
 	for i := 0; i < num; i++ {
@@ -95,7 +98,7 @@ func TestList(t *testing.T) {
 
 func assertSlicey(t *testing.T, nr *node, cmp []Thing) {
 	if sl := nr.ToSlice(); !reflect.DeepEqual(sl, cmp) {
-		t.Errorf("%v should be %#v but is %#v", nr, cmp, sl)
+		t.Errorf("%v should be %#v but is %#v", nr.Describe(), cmp, sl)
 	}
 }
 
@@ -107,7 +110,6 @@ func assertPop(t *testing.T, nr *node, th Thing) {
 }
 
 func TestPushPop(t *testing.T) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(node)
 	assertSlicey(t, nr, []Thing{nil})
 	nr.add("hej")
@@ -124,16 +126,22 @@ func TestPushPop(t *testing.T) {
 	assertSlicey(t, nr, []Thing{nil})
 	assertPop(t, nr, nil)
 	assertSlicey(t, nr, []Thing{nil})
+}
+
+func TestConcPushPop(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	nr := new(node)
+	assertSlicey(t, nr, []Thing{nil})
 	nr.add("1")
 	nr.add("2")
 	nr.add("3")
 	nr.add("4")
 	do := make(chan bool)
 	done := make(chan bool)
-	go fiddle(nr, do, done)
-	go fiddle(nr, do, done)
-	go fiddle(nr, do, done)
-	go fiddle(nr, do, done)
+	go fiddle(t, nr, do, done)
+	go fiddle(t, nr, do, done)
+	go fiddle(t, nr, do, done)
+	go fiddle(t, nr, do, done)
 	close(do)
 	<-done
 	<-done

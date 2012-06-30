@@ -85,27 +85,31 @@ func (self *List) Inject(c Comparable) {
 
 
 
-func isDeleted(p *node) bool {
-	return uintptr(unsafe.Pointer(p)) & 1 == 1
+func isDeleted(p unsafe.Pointer) bool {
+	return uintptr(p) & 1 == 1
 }
-func deleted(p *node) *node {
-	return (*node)(unsafe.Pointer(uintptr(unsafe.Pointer(p)) | 1))
+func deleted(p unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(uintptr(p) | 1)
 }
-func normal(p *node) *node {
-	return (*node)(unsafe.Pointer(uintptr(unsafe.Pointer(p)) &^ 1))
+func normal(p unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(uintptr(p) &^ 1)
 }
 
 type node struct {
 	unsafe.Pointer
 	value Thing
 }
-func (self *node) next() *node {
-	current := (*node)(atomic.LoadPointer(&self.Pointer))
-	for current != nil && isDeleted(current) {
-		atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(current), unsafe.Pointer(normal(current).next()))
-		current = (*node)(atomic.LoadPointer(&self.Pointer))
+func (self *node) next() (next *node) {
+	next = (*node)(normal(self.Pointer))
+	for next != nil {
+		if nextPointer := atomic.LoadPointer(&next.Pointer); isDeleted(nextPointer) {
+			atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(next), normal(nextPointer))
+			next = (*node)(normal(atomic.LoadPointer(&self.Pointer)))
+		} else {
+			return next
+		}
 	}
-	return current
+	return
 }
 func (self *node) val() Thing {
 	if self == nil {
@@ -117,7 +121,14 @@ func (self *node) String() string {
 	return fmt.Sprint(self.ToSlice())
 }
 func (self *node) Describe() string {
-	return fmt.Sprintf("%#v -> %#v", self, self.next())
+	if self == nil {
+		return fmt.Sprint(nil)
+	}
+	deleted := ""
+	if isDeleted(self.Pointer) {
+		deleted = " (x)"
+	}
+	return fmt.Sprintf("%#v%v -> %v", self, deleted, self.next().Describe())
 }
 func (self *node) add(c Thing) {
 	alloc := &node{}
@@ -200,7 +211,11 @@ func (self *node) verify() (err error) {
 	current := self
 	var last Thing
 	var bad [][]Thing
+	seen := make(map[*node]bool)
 	for current != nil {
+		if _, ok := seen[current]; ok {
+			return fmt.Errorf("%#v is circular!", self)
+		}
 		value := current.value
 		if last != &list_head {
 			if comp, ok := value.(Comparable); ok {
@@ -209,6 +224,7 @@ func (self *node) verify() (err error) {
 				}
 			}
 		}
+		seen[current] = true
 		last = value
 		current = current.next()
 	}
@@ -225,15 +241,13 @@ func (self *node) verify() (err error) {
 	return fmt.Errorf("%v is badly ordered. The following nodes are in the wrong order: %v", self, string(buffer.Bytes()));
 	
 }
-func (self *node) removeExact(oldNode *node) bool {
-	if oldNode == nil {
-		return true
-	}
-	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(oldNode), unsafe.Pointer(deleted(oldNode)))
+func (self *node) doRemove() bool {
+	ptr := self.Pointer
+	return atomic.CompareAndSwapPointer(&self.Pointer, normal(ptr), deleted(ptr))
 }
 func (self *node) remove() Thing {
 	n := self.next()
-	for !self.removeExact(n) {
+	for n != nil && !n.doRemove() {
 		n = self.next()
 	}
 	if n != nil {
