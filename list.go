@@ -202,9 +202,11 @@ func (self *node) verify() (err error) {
 	var bad [][]Thing
 	for current != nil {
 		value := current.value
-		if comp, ok := value.(Comparable); ok {
-			if comp.Compare(last) < 0 {
-				bad = append(bad, []Thing{last,value})
+		if last != &list_head {
+			if comp, ok := value.(Comparable); ok {
+				if comp.Compare(last) < 0 {
+					bad = append(bad, []Thing{last,value})
+				}
 			}
 		}
 		last = value
