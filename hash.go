@@ -43,7 +43,7 @@ type Equalable interface {
 }
 
 /*
- * Hashable types can be in a Hash.
+ Hashable types can be in a Hash.
  */
 type Hashable interface {
 	Equalable
@@ -92,12 +92,12 @@ func (self *entry) Compare(t Thing) int {
 }
 
 /*
- * Hash is a hash table based on "Split-Ordered Lists: Lock-Free Extensible Hash Tables" by Ori Shalev and Nir Shavit <http://www.cs.ucf.edu/~dcm/Teaching/COT4810-Spring2011/Literature/SplitOrderedLists.pdf>.
- *
- * TL;DR: It creates a linked list containing all hashed entries, and an extensible table of 'shortcuts' into said list. To enable future extensions to the shortcut table, the list is ordered in reversed bit order so that new table entries point into finer and finer sections of the potential address space.
- *
- * To enable growing the table a two dimensional slice of unsafe.Pointers is used, where each consecutive slice is twice the size of the one before.
- * This makes it simple to allocate exponentially more memory for the table with only a single extra indirection.
+ Hash is a hash table based on "Split-Ordered Lists: Lock-Free Extensible Hash Tables" by Ori Shalev and Nir Shavit <http://www.cs.ucf.edu/~dcm/Teaching/COT4810-Spring2011/Literature/SplitOrderedLists.pdf>.
+ 
+ TL;DR: It creates a linked list containing all hashed entries, and an extensible table of 'shortcuts' into said list. To enable future extensions to the shortcut table, the list is ordered in reversed bit order so that new table entries point into finer and finer sections of the potential address space.
+ 
+ To enable growing the table a two dimensional slice of unsafe.Pointers is used, where each consecutive slice is twice the size of the one before.
+ This makes it simple to allocate exponentially more memory for the table with only a single extra indirection.
  */
 type Hash struct {
 	exponent uint32
@@ -115,7 +115,7 @@ func (self *Hash) Size() int {
 	return int(atomic.LoadInt64(&self.size))
 }
 /*
- * Verify the integrity of the Hash. Used mostly in my own tests but go ahead and call it if you fear corruption.
+ Verify the integrity of the Hash. Used mostly in my own tests but go ahead and call it if you fear corruption.
  */
 func (self *Hash) Verify() error {
 	bucket := self.getBucketByHashCode(0)
@@ -138,7 +138,7 @@ func (self *Hash) Verify() error {
 	return nil
 }
 /*
- * ToMap returns a map[Hashable]Thing that is logically identical to the Hash.
+ ToMap returns a map[Hashable]Thing that is logically identical to the Hash.
  */
 func (self *Hash) ToMap() map[Hashable]Thing {
 	rval := make(map[Hashable]Thing)
@@ -163,8 +163,8 @@ func (self *Hash) isBucket(n *node) (isBucket bool, index, superIndex, subIndex 
 	return
 }
 /*
- * Describe returns a multi line description of the contents of the map for 
- * those of you interested in debugging it or seeing an example of how split-ordered lists work.
+ Describe returns a multi line description of the contents of the map for 
+ those of you interested in debugging it or seeing an example of how split-ordered lists work.
  */
 func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v maxload:%v}\n", self, self.size, self.exponent, self.loadFactor))
@@ -184,7 +184,7 @@ func (self *Hash) String() string {
 	return fmt.Sprint(self.ToMap())
 }
 /*
- * Get returns the value at k and whether it was present in the Hash.
+ Get returns the value at k and whether it was present in the Hash.
  */
 func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 	testEntry := newRealEntry(k, nil)
@@ -196,7 +196,7 @@ func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 	return nil, false
 }
 /*
- * Delete removes k from the Hash and returns any value it removed.
+ Delete removes k from the Hash and returns any value it removed.
  */
 func (self *Hash) Delete(k Hashable) (rval Thing) {
 	testEntry := newRealEntry(k, nil)
@@ -217,7 +217,7 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 	return
 }
 /*
- * PutIfMissing will insert v under k if k contains expected in the Hash, and return whether it inserted anything.
+ PutIfMissing will insert v under k if k contains expected in the Hash, and return whether it inserted anything.
  */
 func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) bool {
 	newEntry := newRealEntry(k, v)
@@ -241,7 +241,7 @@ func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) bool {
 	return false
 }
 /*
- * PutIfMissing will insert v under k if k was missing from the Hash, and return whether it inserted anything.
+ PutIfMissing will insert v under k if k was missing from the Hash, and return whether it inserted anything.
  */
 func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
 	newEntry := newRealEntry(k, v)
@@ -261,7 +261,7 @@ func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
 	return false
 }
 /*
- * Put k and v in the Hash and return any overwritten value.
+ Put k and v in the Hash and return any overwritten value.
  */
 func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 	newEntry := newRealEntry(k, v)
