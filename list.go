@@ -49,10 +49,12 @@ func (self *List) Push(t Thing) {
 /*
  * Pop removes and returns the top of the List.
  */
-func (self *List) Pop() Thing {
-	rval := self.node.remove()
-	atomic.AddInt64(&self.size, -1)
-	return rval
+func (self *List) Pop() (rval Thing, ok bool) {
+	if rval, ok := self.node.remove(); ok {
+		atomic.AddInt64(&self.size, -1)
+		return rval, true
+	}
+	return nil, false
 }
 func (self *List) String() string {
 	return fmt.Sprint(self.ToSlice())
@@ -245,13 +247,13 @@ func (self *node) doRemove() bool {
 	ptr := self.Pointer
 	return atomic.CompareAndSwapPointer(&self.Pointer, normal(ptr), deleted(ptr))
 }
-func (self *node) remove() Thing {
+func (self *node) remove() (rval Thing, ok bool) {
 	n := self.next()
 	for n != nil && !n.doRemove() {
 		n = self.next()
 	}
 	if n != nil {
-		return n.value
+		return n.value, true
 	}
-	return nil
+	return nil, false
 }

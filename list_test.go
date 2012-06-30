@@ -36,8 +36,8 @@ func fiddle(t *testing.T, nr *node, do, done chan bool) {
 		nr.add(x)
 	}
 	for i := 0; i < num; i++ {
-		if x := nr.remove(); x == nil {
-			t.Errorf("%v should pop something, but got nil")
+		if x, ok := nr.remove(); !ok {
+			t.Errorf("%v should pop something, but got %v", x)
 		}
 	}
 	done <- true
@@ -57,7 +57,11 @@ func fiddleAndAssertSort(t *testing.T, nr *node, do chan bool, ichan, rchan chan
 		}
 	}
 	for i := 0; i < num; i++ {
-		removed = append(removed, nr.remove().(c))
+		if r, ok := nr.remove(); ok {
+			removed = append(removed, r.(c))
+		} else {
+			t.Error(nr, "should remove something, but got", r)
+		}
 	}
 	ichan <- injected
 	rchan <- removed
@@ -72,7 +76,7 @@ func assertListy(t *testing.T, l *List, cmp []Thing) {
 	}
 	tmp := make([]Thing, len(cmp))
 	for ind, v := range cmp {
-		popped := l.Pop() 
+		popped, _ := l.Pop() 
 		tmp[len(cmp) - ind - 1] = popped
 		if !reflect.DeepEqual(v, popped) {
 			t.Errorf("element %v of %v should be %v but was %v", ind, l, v, popped)
@@ -103,7 +107,7 @@ func assertSlicey(t *testing.T, nr *node, cmp []Thing) {
 }
 
 func assertPop(t *testing.T, nr *node, th Thing) {
-	p := nr.remove()
+	p, _ := nr.remove()
 	if !reflect.DeepEqual(p, th) {
 		t.Error(nr, " should pop ", th, " but popped ", p)
 	}
