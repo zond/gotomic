@@ -40,6 +40,6 @@ See https://github.com/zond/gotomic/blob/master/examples/example.go or https://g
 
 ## Bugs
 
-There seems to be a race condition in the List implementation (run the tests many times and the concurrency tests will warn now and then). Oddly enough the Hash seems to recover enough to still contain the proper data when the test is finished.
+No known bugs.
 
-Not production ready, unfortunately.
+I have not tried it on more than my personal laptop however, so if you want to try and force it to misbehave on a heftier machine than a 4 cpu MacBook Air please do!
