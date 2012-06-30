@@ -146,7 +146,11 @@ func (self *node) addBefore(t Thing, allocatedNode, before *node) bool {
 	}
 	allocatedNode.value = t
 	allocatedNode.Pointer = unsafe.Pointer(before)
-	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(before), unsafe.Pointer(allocatedNode))
+	newPointer := unsafe.Pointer(allocatedNode)
+	if isDeleted(self.Pointer) {
+		newPointer = deleted(newPointer)
+	}
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(before), newPointer)
 }
 /*
  * inject c into self either before the first matching value (c.Compare(value) == 0), before the first value
