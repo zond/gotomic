@@ -8,12 +8,12 @@ import (
 )
 
 type hit struct {
-	left *node
-	node *node
-	right *node
+	left *element
+	element *element
+	right *element
 }
 func (self *hit) String() string {
-	return fmt.Sprintf("&hit{%v,%v,%v}", self.left.val(), self.node.val(), self.right.val())
+	return fmt.Sprintf("&hit{%v,%v,%v}", self.left.val(), self.element.val(), self.right.val())
 }
 
 /*
@@ -33,24 +33,24 @@ var list_head = "LIST_HEAD"
  It is thread safe and non-blocking, and supports ordered elements by using List#inject with values implementing Comparable.
  */
 type List struct {
-	*node
+	*element
 	size int64
 }
 func NewList() *List {
-	return &List{&node{nil, &list_head}, 0}
+	return &List{&element{nil, &list_head}, 0}
 }
 /*
  Push adds t to the top of the List.
  */
 func (self *List) Push(t Thing) {
-	self.node.add(t)
+	self.element.add(t)
 	atomic.AddInt64(&self.size, 1)
 }
 /*
  Pop removes and returns the top of the List.
  */
 func (self *List) Pop() (rval Thing, ok bool) {
-	if rval, ok := self.node.remove(); ok {
+	if rval, ok := self.element.remove(); ok {
 		atomic.AddInt64(&self.size, -1)
 		return rval, true
 	}
@@ -63,14 +63,14 @@ func (self *List) String() string {
  ToSlice returns a []Thing that is logically identical to the List.
  */
 func (self *List) ToSlice() []Thing {
-	return self.node.next().ToSlice()
+	return self.element.next().ToSlice()
 }
 /*
  Search return the first element in the list that matches c (c.Compare(element) == 0)
  */
 func (self *List) Search(c Comparable) Thing {
-	if hit := self.node.search(c); hit.node != nil {
-		return hit.node.val()
+	if hit := self.element.search(c); hit.element != nil {
+		return hit.element.val()
 	}
 	return nil
 }
@@ -81,13 +81,13 @@ func (self *List) Size() int {
  Inject c into the List at the first place where it is <= to all elements before it.
  */
 func (self *List) Inject(c Comparable) {
-	self.node.inject(c)
+	self.element.inject(c)
 	atomic.AddInt64(&self.size, 1)
 }
 
 
 /*
- Note that if the pointer has the deleted flag set, it is the node containing the pointer that is deleted!
+ Note that if the pointer has the deleted flag set, it is the element containing the pointer that is deleted!
  */
 func isDeleted(p unsafe.Pointer) bool {
 	return uintptr(p) & 1 == 1
@@ -99,26 +99,26 @@ func normal(p unsafe.Pointer) unsafe.Pointer {
 	return unsafe.Pointer(uintptr(p) &^ 1)
 }
 
-type node struct {
+type element struct {
 	/*
-	 The next node in the list. If this pointer has the deleted flag set it means THIS node, not the next one, is deleted.
+	 The next element in the list. If this pointer has the deleted flag set it means THIS element, not the next one, is deleted.
 	 */
 	unsafe.Pointer
 	value Thing
 }
-func (self *node) next() *node {
+func (self *element) next() *element {
 	next := atomic.LoadPointer(&self.Pointer)
 	for next != nil {
 		/*
-		 If the pointer of the next node is marked as deleted, that means the next node is supposed to be GONE
+		 If the pointer of the next element is marked as deleted, that means the next element is supposed to be GONE
 		 */
-		if nextPointer := atomic.LoadPointer(&(*node)(normal(next)).Pointer); isDeleted(nextPointer) {
+		if nextPointer := atomic.LoadPointer(&(*element)(normal(next)).Pointer); isDeleted(nextPointer) {
 			/*
 			 If OUR pointer is marked as deleted, that means WE are supposed to be gone
 			 */
 			if isDeleted(next) {
 				/*
-				 .. which means that we can steal the pointer of the next node right away,
+				 .. which means that we can steal the pointer of the next element right away,
 				 it points to the right place AND it is marked as deleted.
 				 */
 				atomic.CompareAndSwapPointer(&self.Pointer, next, nextPointer)
@@ -131,25 +131,25 @@ func (self *node) next() *node {
 			next = atomic.LoadPointer(&self.Pointer)
 		} else {
 			/*
-			 If the next node is NOT deleted, then we simply return a pointer to it, and make
+			 If the next element is NOT deleted, then we simply return a pointer to it, and make
 			 damn sure that the pointer is a working one even if we are deleted (and, therefore,
 			 our pointer is marked as deleted).
 			 */
-			return (*node)(normal(next))
+			return (*element)(normal(next))
 		}
 	}
 	return nil
 }
-func (self *node) val() Thing {
+func (self *element) val() Thing {
 	if self == nil {
 		return nil
 	}
 	return self.value
 }
-func (self *node) String() string {
+func (self *element) String() string {
 	return fmt.Sprint(self.ToSlice())
 }
-func (self *node) Describe() string {
+func (self *element) Describe() string {
 	if self == nil {
 		return fmt.Sprint(nil)
 	}
@@ -159,17 +159,17 @@ func (self *node) Describe() string {
 	}
 	return fmt.Sprintf("%#v%v -> %v", self, deleted, self.next().Describe())
 }
-func (self *node) add(c Thing) {
-	alloc := &node{}
+func (self *element) add(c Thing) {
+	alloc := &element{}
 	for !self.addBefore(c, alloc, self.next()) {}
 }
-func (self *node) addBefore(t Thing, allocatedNode, before *node) bool {
+func (self *element) addBefore(t Thing, allocatedElement, before *element) bool {
 	if self.next() != before {
 		return false
 	}
-	allocatedNode.value = t
-	allocatedNode.Pointer = unsafe.Pointer(before)
-	newPointer := unsafe.Pointer(allocatedNode)
+	allocatedElement.value = t
+	allocatedElement.Pointer = unsafe.Pointer(before)
+	newPointer := unsafe.Pointer(allocatedElement)
 	if isDeleted(self.Pointer) {
 		newPointer = deleted(newPointer)
 	}
@@ -179,24 +179,24 @@ func (self *node) addBefore(t Thing, allocatedNode, before *node) bool {
  inject c into self either before the first matching value (c.Compare(value) == 0), before the first value
  it should be before (c.Compare(value) < 0) or after the first value it should be after (c.Compare(value) > 0).
  */
-func (self *node) inject(c Comparable) {
-	alloc := &node{}
+func (self *element) inject(c Comparable) {
+	alloc := &element{}
 	for {
 		hit := self.search(c)
 		if hit.left != nil {
-			if hit.node != nil {
-				if hit.left.addBefore(c, alloc, hit.node) { break }
+			if hit.element != nil {
+				if hit.left.addBefore(c, alloc, hit.element) { break }
 			} else {
 				if hit.left.addBefore(c, alloc, hit.right) { break }
 			}
-		} else if hit.node != nil {
-			if hit.node.addBefore(c, alloc, hit.right) { break }
+		} else if hit.element != nil {
+			if hit.element.addBefore(c, alloc, hit.right) { break }
 		} else {
-			panic(fmt.Errorf("Unable to inject %v properly into %v, it ought to be first but was injected into the first node of the list!", c, self))
+			panic(fmt.Errorf("Unable to inject %v properly into %v, it ought to be first but was injected into the first element of the list!", c, self))
 		}
 	}
 }
-func (self *node) ToSlice() []Thing {
+func (self *element) ToSlice() []Thing {
 	rval := make([]Thing, 0)
 	current := self
 	for current != nil {
@@ -210,29 +210,29 @@ func (self *node) ToSlice() []Thing {
  
  Will stop searching when finding nil or an element that should be after c (c.Compare(element) < 0).
  
- Will return a hit containing the last nodeRef and node before a match (if no match, the last nodeRef and node before
- it stops searching), the nodeRef and node for the match (if a match) and the last nodeRef and node after the match
- (if no match, the first nodeRef and node, or nil/nil if at the end of the list).
+ Will return a hit containing the last elementRef and element before a match (if no match, the last elementRef and element before
+ it stops searching), the elementRef and element for the match (if a match) and the last elementRef and element after the match
+ (if no match, the first elementRef and element, or nil/nil if at the end of the list).
  */
-func (self *node) search(c Comparable) (rval *hit) {
+func (self *element) search(c Comparable) (rval *hit) {
 	rval = &hit{nil, self, nil}
 	for {
-		if rval.node == nil {
+		if rval.element == nil {
 			return
 		}
-		rval.right = rval.node.next()
-		if rval.node.value != &list_head {
-			switch cmp := c.Compare(rval.node.value); {
+		rval.right = rval.element.next()
+		if rval.element.value != &list_head {
+			switch cmp := c.Compare(rval.element.value); {
 			case cmp < 0:
-				rval.right = rval.node
-				rval.node = nil
+				rval.right = rval.element
+				rval.element = nil
 				return
 			case cmp == 0:
 				return
 			}
 		}
-		rval.left = rval.node
-		rval.node = rval.left.next()
+		rval.left = rval.element
+		rval.element = rval.left.next()
 		rval.right = nil
 	}
 	panic(fmt.Sprint("Unable to search for ", c, " in ", self))
@@ -240,11 +240,11 @@ func (self *node) search(c Comparable) (rval *hit) {
 /*
  Verify that all Comparable values in this list are after values they should be after (c.Compare(last) >= 0).
  */
-func (self *node) verify() (err error) {
+func (self *element) verify() (err error) {
 	current := self
 	var last Thing
 	var bad [][]Thing
-	seen := make(map[*node]bool)
+	seen := make(map[*element]bool)
 	for current != nil {
 		if _, ok := seen[current]; ok {
 			return fmt.Errorf("%#v is circular!", self)
@@ -271,14 +271,14 @@ func (self *node) verify() (err error) {
 			fmt.Fprint(buffer, "; ")
 		}
 	}
-	return fmt.Errorf("%v is badly ordered. The following nodes are in the wrong order: %v", self, string(buffer.Bytes()));
+	return fmt.Errorf("%v is badly ordered. The following elements are in the wrong order: %v", self, string(buffer.Bytes()));
 	
 }
-func (self *node) doRemove() bool {
+func (self *element) doRemove() bool {
 	ptr := self.Pointer
 	return atomic.CompareAndSwapPointer(&self.Pointer, normal(ptr), deleted(ptr))
 }
-func (self *node) remove() (rval Thing, ok bool) {
+func (self *element) remove() (rval Thing, ok bool) {
 	n := self.next()
 	for n != nil && !n.doRemove() {
 		n = self.next()

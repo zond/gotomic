@@ -28,7 +28,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-func fiddle(t *testing.T, nr *node, do, done chan bool) {
+func fiddle(t *testing.T, nr *element, do, done chan bool) {
 	<- do
 	num := 10000
 	for i := 0; i < num; i++ {
@@ -43,7 +43,7 @@ func fiddle(t *testing.T, nr *node, do, done chan bool) {
 	done <- true
 }
 
-func fiddleAndAssertSort(t *testing.T, nr *node, do chan bool, ichan, rchan chan []c) {
+func fiddleAndAssertSort(t *testing.T, nr *element, do chan bool, ichan, rchan chan []c) {
 	<- do
 	num := 1000
 	var injected []c
@@ -100,13 +100,13 @@ func TestList(t *testing.T) {
 	assertListy(t, l, []Thing{"blar", "hehu","knap","plur"})
 }
 
-func assertSlicey(t *testing.T, nr *node, cmp []Thing) {
+func assertSlicey(t *testing.T, nr *element, cmp []Thing) {
 	if sl := nr.ToSlice(); !reflect.DeepEqual(sl, cmp) {
 		t.Errorf("%v should be %#v but is %#v", nr.Describe(), cmp, sl)
 	}
 }
 
-func assertPop(t *testing.T, nr *node, th Thing) {
+func assertPop(t *testing.T, nr *element, th Thing) {
 	p, _ := nr.remove()
 	if !reflect.DeepEqual(p, th) {
 		t.Error(nr, " should pop ", th, " but popped ", p)
@@ -114,7 +114,7 @@ func assertPop(t *testing.T, nr *node, th Thing) {
 }
 
 func TestPushPop(t *testing.T) {
-	nr := new(node)
+	nr := new(element)
 	assertSlicey(t, nr, []Thing{nil})
 	nr.add("hej")
 	assertSlicey(t, nr, []Thing{nil,"hej"})
@@ -134,7 +134,7 @@ func TestPushPop(t *testing.T) {
 
 func TestConcPushPop(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(node)
+	nr := new(element)
 	assertSlicey(t, nr, []Thing{nil})
 	nr.add("1")
 	nr.add("2")
@@ -156,35 +156,35 @@ func TestConcPushPop(t *testing.T) {
 
 const ANY = "ANY VALUE"
 
-func searchTest(t *testing.T, nr *node, s c, l, n, r Thing) {
+func searchTest(t *testing.T, nr *element, s c, l, n, r Thing) {
 	h := nr.search(s)
 	if (l != ANY && !reflect.DeepEqual(h.left.val(), l)) || 
-		(n != ANY && !reflect.DeepEqual(h.node.val(), n)) || 
+		(n != ANY && !reflect.DeepEqual(h.element.val(), n)) || 
 		(r != ANY && !reflect.DeepEqual(h.right.val(), r)) {
-		t.Error(nr, ".search(", s, ") should produce ", l, n, r, " but produced ", h.left.val(), h.node.val(), h.right.val())
+		t.Error(nr, ".search(", s, ") should produce ", l, n, r, " but produced ", h.left.val(), h.element.val(), h.right.val())
 	}
 }
 
 func TestPushBefore(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := new(node)
+	nr := new(element)
 	nr.add("h")
 	nr.add("g")
 	nr.add("f")
 	nr.add("d")
 	nr.add("c")
 	nr.add("b")
-	node := &node{}
-	if nr.addBefore("a", node, nr) {
+	element := &element{}
+	if nr.addBefore("a", element, nr) {
 		t.Error("should not be possible")
 	}
-	if !nr.addBefore("a", node, nr.next()) {
+	if !nr.addBefore("a", element, nr.next()) {
 		t.Error("should be possible")
 	}
 }
 
 func TestSearch(t *testing.T) {
-	nr := &node{nil, &list_head}
+	nr := &element{nil, &list_head}
 	nr.add(c(9))
 	nr.add(c(8))
 	nr.add(c(7))
@@ -207,7 +207,7 @@ func TestSearch(t *testing.T) {
 
 func TestVerify(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := &node{nil, &list_head}
+	nr := &element{nil, &list_head}
 	nr.inject(c(3))
 	nr.inject(c(5))
 	nr.inject(c(9))
@@ -218,7 +218,7 @@ func TestVerify(t *testing.T) {
 	if err := nr.verify(); err != nil {
 		t.Error(nr, "should verify as ok, got", err)
 	}
-	nr = &node{nil, &list_head}
+	nr = &element{nil, &list_head}
 	nr.add(c(3))
 	nr.add(c(5))
 	nr.add(c(9))
@@ -226,7 +226,7 @@ func TestVerify(t *testing.T) {
 	nr.add(c(4))
 	nr.add(c(8))
 	assertSlicey(t, nr, []Thing{&list_head, c(8),c(4),c(7),c(9),c(5),c(3)})
-	s := fmt.Sprintf("[%v 8 4 7 9 5 3] is badly ordered. The following nodes are in the wrong order: 8,4; 9,5; 5,3", &list_head)
+	s := fmt.Sprintf("[%v 8 4 7 9 5 3] is badly ordered. The following elements are in the wrong order: 8,4; 9,5; 5,3", &list_head)
 	if err := nr.verify(); err.Error() != s {
 		t.Error(nr, "should have errors", s, "but had", err)
 	}
@@ -234,7 +234,7 @@ func TestVerify(t *testing.T) {
 
 func TestInjectAndSearch(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := &node{nil, &list_head}
+	nr := &element{nil, &list_head}
 	nr.inject(c(3))
 	nr.inject(c(5))
 	nr.inject(c(9))
@@ -257,7 +257,7 @@ func TestInjectAndSearch(t *testing.T) {
 
 func TestConcInjectAndSearch(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	nr := &node{nil, &list_head}
+	nr := &element{nil, &list_head}
 	nr.inject(c(3))
 	nr.inject(c(5))
 	nr.inject(c(9))

@@ -13,29 +13,29 @@ const DEFAULT_LOAD_FACTOR = 0.5
 
 type hashHit hit
 func (self *hashHit) search(cmp *entry) (rval *hashHit) {
-	rval = &hashHit{self.left, self.node, self.right}
+	rval = &hashHit{self.left, self.element, self.right}
 	for {
-		if rval.node == nil {
+		if rval.element == nil {
 			break
 		}
-		rval.right = rval.node.next()
-		e := rval.node.value.(*entry)
+		rval.right = rval.element.next()
+		e := rval.element.value.(*entry)
 		if e.hashKey != cmp.hashKey {
-			rval.right = rval.node
-			rval.node = nil
+			rval.right = rval.element
+			rval.element = nil
 			break
 		}
 		if cmp.key.Equals(e.key) {
 			break
 		}
-		rval.left = rval.node
-		rval.node = rval.left.next()
+		rval.left = rval.element
+		rval.element = rval.left.next()
 		rval.right = nil
 	}
 	return
 }
 func (self *hashHit) String() string {
-	return fmt.Sprint("&hashHit{", self.left.val(), self.node.val(), self.right.val(), "}")
+	return fmt.Sprint("&hashHit{", self.left.val(), self.element.val(), self.right.val(), "}")
 }
 
 type Equalable interface {
@@ -142,16 +142,16 @@ func (self *Hash) Verify() error {
  */
 func (self *Hash) ToMap() map[Hashable]Thing {
 	rval := make(map[Hashable]Thing)
-	node := self.getBucketByHashCode(0)
-	for node != nil {
-		if e := node.value.(*entry); e.real() {
+	element := self.getBucketByHashCode(0)
+	for element != nil {
+		if e := element.value.(*entry); e.real() {
 			rval[e.key] = e.val()
 		}
-		node = node.next()
+		element = element.next()
 	}
 	return rval
 }
-func (self *Hash) isBucket(n *node) (isBucket bool, index, superIndex, subIndex uint32) {
+func (self *Hash) isBucket(n *element) (isBucket bool, index, superIndex, subIndex uint32) {
 	e := n.value.(*entry)
 	index = e.hashCode & ((1 << self.exponent) - 1)	
 	superIndex, subIndex = self.getBucketIndices(index)
@@ -168,15 +168,15 @@ func (self *Hash) isBucket(n *node) (isBucket bool, index, superIndex, subIndex 
  */
 func (self *Hash) Describe() string {
 	buffer := bytes.NewBufferString(fmt.Sprintf("&Hash{%p size:%v exp:%v maxload:%v}\n", self, self.size, self.exponent, self.loadFactor))
-	node := self.getBucketByIndex(0)
-	for node != nil {
-		e := node.value.(*entry)
-		if ok, index, super, sub := self.isBucket(node); ok {
+	element := self.getBucketByIndex(0)
+	for element != nil {
+		e := element.value.(*entry)
+		if ok, index, super, sub := self.isBucket(element); ok {
 			fmt.Fprintf(buffer, "%3v:%3v,%3v: %v *\n", index, super, sub, e)
 		} else {
 			fmt.Fprintf(buffer, "             %v\n", e)
 		}
-		node = node.next()
+		element = element.next()
 	}
 	return string(buffer.Bytes())
 }
@@ -190,8 +190,8 @@ func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 	testEntry := newRealEntry(k, nil)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
-	if hit2 := hit.search(testEntry); hit2.node != nil {
-		return hit2.node.value.(*entry).val(), true
+	if hit2 := hit.search(testEntry); hit2.element != nil {
+		return hit2.element.value.(*entry).val(), true
 	}
 	return nil, false
 }
@@ -203,9 +203,9 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 	for {
 		bucket := self.getBucketByHashCode(testEntry.hashCode)
 		hit := (*hashHit)(bucket.search(testEntry))
-		if hit2 := hit.search(testEntry); hit2.node != nil {
-			if hit2.node.doRemove() {
-				rval = hit2.node.value.(*entry).val()
+		if hit2 := hit.search(testEntry); hit2.element != nil {
+			if hit2.element.doRemove() {
+				rval = hit2.element.value.(*entry).val()
 				self.addSize(-1)
 				break
 			}
@@ -224,10 +224,10 @@ func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) bool {
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
-		if hit2 := hit.search(newEntry); hit2.node == nil {
+		if hit2 := hit.search(newEntry); hit2.element == nil {
 			return false
 		} else {
-			oldEntry := hit2.node.value.(*entry)
+			oldEntry := hit2.element.value.(*entry)
 			oldValuePtr := atomic.LoadPointer(&oldEntry.value)
 			if expected.Equals(*(*Thing)(oldValuePtr)) {
 				if atomic.CompareAndSwapPointer(&oldEntry.value, oldValuePtr, unsafe.Pointer(newEntry.value)) {
@@ -245,11 +245,11 @@ func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) bool {
  */
 func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
 	newEntry := newRealEntry(k, v)
-	alloc := &node{}
+	alloc := &element{}
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
-		if hit2 := hit.search(newEntry); hit2.node == nil {
+		if hit2 := hit.search(newEntry); hit2.element == nil {
 			if hit2.left.addBefore(newEntry, alloc, hit2.right) {
 				self.addSize(1)
 				return true
@@ -265,18 +265,18 @@ func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
  */
 func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 	newEntry := newRealEntry(k, v)
-	alloc := &node{}
+	alloc := &element{}
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
-		if hit2 := hit.search(newEntry); hit2.node == nil {
+		if hit2 := hit.search(newEntry); hit2.element == nil {
 			if hit2.left.addBefore(newEntry, alloc, hit2.right) {
 				self.addSize(1)
 				rval = nil
 				return
 			}
 		} else {
-			oldEntry := hit2.node.value.(*entry)
+			oldEntry := hit2.element.value.(*entry)
 			rval = oldEntry.val()
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
 			return
@@ -302,7 +302,7 @@ func (self *Hash) getPreviousBucketIndex(bucketKey uint32) uint32 {
 	exp := atomic.LoadUint32(&self.exponent)
 	return reverse( ((bucketKey >> (MAX_EXPONENT - exp)) - 1) << (MAX_EXPONENT - exp));
 }
-func (self *Hash) getBucketByHashCode(hashCode uint32) *node {
+func (self *Hash) getBucketByHashCode(hashCode uint32) *element {
 	return self.getBucketByIndex(hashCode & ((1 << self.exponent) - 1))
 }
 func (self *Hash) getBucketIndices(index uint32) (superIndex, subIndex uint32) {
@@ -313,25 +313,25 @@ func (self *Hash) getBucketIndices(index uint32) (superIndex, subIndex uint32) {
 	}
 	return
 }
-func (self *Hash) getBucketByIndex(index uint32) (bucket *node) {
+func (self *Hash) getBucketByIndex(index uint32) (bucket *element) {
 	superIndex, subIndex := self.getBucketIndices(index)
 	subBuckets := *(*[]unsafe.Pointer)(self.buckets[superIndex])
 	for {
-		bucket = (*node)(subBuckets[subIndex])
+		bucket = (*element)(subBuckets[subIndex])
 		if bucket != nil {
 			break
 		}
 		mockEntry := newMockEntry(index)
 		if index == 0 {
-			bucket := &node{nil, mockEntry}
+			bucket := &element{nil, mockEntry}
 			atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(bucket))
 		} else {
 			prev := self.getPreviousBucketIndex(mockEntry.hashKey)
 			previousBucket := self.getBucketByIndex(prev)
-			if hit := previousBucket.search(mockEntry); hit.node == nil {
-				hit.left.addBefore(mockEntry, &node{}, hit.right)
+			if hit := previousBucket.search(mockEntry); hit.element == nil {
+				hit.left.addBefore(mockEntry, &element{}, hit.right)
 			} else {
-				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.node))
+				atomic.CompareAndSwapPointer(&subBuckets[subIndex], nil, unsafe.Pointer(hit.element))
 			}
 		}
 	}
