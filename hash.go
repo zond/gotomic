@@ -56,9 +56,11 @@ type entry struct {
 	key Hashable
 	value unsafe.Pointer
 }
-func newRealEntry(k Hashable, v Thing) *entry {
-	hc := k.HashCode()
+func newRealEntryWithHashCode(k Hashable, v Thing, hc uint32) *entry {
 	return &entry{hc, reverse(hc) | 1, k, unsafe.Pointer(&v)}
+}
+func newRealEntry(k Hashable, v Thing) *entry {
+	return newRealEntryWithHashCode(k, v, k.HashCode())
 }
 func newMockEntry(hashCode uint32) *entry {
 	return &entry{hashCode, reverse(hashCode) &^ 1, nil, nil}
@@ -184,22 +186,33 @@ func (self *Hash) String() string {
 	return fmt.Sprint(self.ToMap())
 }
 /*
- Get returns the value at k and whether it was present in the Hash.
+ GetHC returns the key with hashCode that equals k.
+ 
+ Use this when you already have the hash code and don't want to force gotomic to calculate it again.
  */
-func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
-	testEntry := newRealEntry(k, nil)
+func (self *Hash) GetHC(hashCode uint32, k Hashable) (rval Thing, ok bool) {
+	testEntry := newRealEntryWithHashCode(k, nil, hashCode)
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
 	if hit2 := hit.search(testEntry); hit2.element != nil {
 		return hit2.element.value.(*entry).val(), true
 	}
 	return nil, false
+
 }
 /*
- Delete removes k from the Hash and returns any value it removed.
+ Get returns the value at k and whether it was present in the Hash.
  */
-func (self *Hash) Delete(k Hashable) (rval Thing) {
-	testEntry := newRealEntry(k, nil)
+func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
+	return self.GetHC(k.HashCode(), k)
+}
+/*
+ DeleteHC removes the key with hashCode that equals k and returns any value it removed.
+ 
+ Use this when you already have the hash code and don't want to force gotomic to calculate it again.
+*/
+func (self *Hash) DeleteHC(hashCode uint32, k Hashable) (rval Thing) {
+	testEntry := newRealEntryWithHashCode(k, nil, hashCode)
 	for {
 		bucket := self.getBucketByHashCode(testEntry.hashCode)
 		hit := (*hashHit)(bucket.search(testEntry))
@@ -215,6 +228,12 @@ func (self *Hash) Delete(k Hashable) (rval Thing) {
 		}
 	}
 	return
+}
+/*
+ Delete removes k from the Hash and returns any value it removed.
+ */
+func (self *Hash) Delete(k Hashable) (rval Thing) {
+	return self.DeleteHC(k.HashCode(), k)
 }
 /*
  PutIfMissing will insert v under k if k contains expected in the Hash, and return whether it inserted anything.
@@ -261,10 +280,12 @@ func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
 	return false
 }
 /*
- Put k and v in the Hash and return any overwritten value.
+ PutHC will put k and v in the Hash using hashCode and return any overwritten value.
+ 
+ Use this when you already have the hash code and don't want to force gotomic to calculate it again.
  */
-func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
-	newEntry := newRealEntry(k, v)
+func (self *Hash) PutHC(hashCode uint32, k Hashable, v Thing) (rval Thing) {
+	newEntry := newRealEntryWithHashCode(k, v, hashCode)
 	alloc := &element{}
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
@@ -283,6 +304,12 @@ func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
 		}
 	}
 	return
+}
+/*
+ Put k and v in the Hash and return any overwritten value.
+ */
+func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
+	return self.PutHC(k.HashCode(), k, v)
 }
 func (self *Hash) addSize(i int) {
 	atomic.AddInt64(&self.size, int64(i))
