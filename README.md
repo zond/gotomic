@@ -47,3 +47,7 @@ http://go.pkgdoc.org/github.com/zond/gotomic
 No known bugs.
 
 I have not tried it on more than my personal laptop however, so if you want to try and force it to misbehave on a heftier machine than a 4 cpu MacBook Air please do!
+
+## Improvements
+
+It would be nice to have a Hash#DeleteIfPresent that atomically deletes matching key/value pairs, but since the implementation is slightly harder than trivial and I see no immediate use case I have been too lazy. Tell me if you need it and I might feel motivated :)

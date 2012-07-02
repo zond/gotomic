@@ -172,6 +172,20 @@ func TestPutIfPresent(t *testing.T) {
 	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v3")})
 }
 
+func TestNilValues(t *testing.T) {
+	h := NewHash()
+	assertMappy(t, h, map[Hashable]Thing{})
+	h.Put(key("k"), nil)
+	assertMappy(t, h, map[Hashable]Thing{key("k"): nil})
+	v, ok := h.Get(key("k"))
+	if !ok {
+		t.Error(h, "should contain 'k'")
+	}
+	if v != nil {
+		t.Error(h, "should contain 'k' => nil")
+	}
+}
+
 func TestPutIfMissing(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
