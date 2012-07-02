@@ -1,16 +1,17 @@
 package gotomic
 
 import (
-	"testing"
-	"reflect"
 	"fmt"
-	"runtime"
-	"math/rand"
-	"time"
 	"math"
+	"math/rand"
+	"reflect"
+	"runtime"
+	"testing"
+	"time"
 )
 
 type c int
+
 func (self c) Compare(t Thing) int {
 	if s, ok := t.(c); ok {
 		if self > s {
@@ -29,7 +30,7 @@ func init() {
 }
 
 func fiddle(t *testing.T, nr *element, do, done chan bool) {
-	<- do
+	<-do
 	num := 10000
 	for i := 0; i < num; i++ {
 		x := rand.Int()
@@ -44,7 +45,7 @@ func fiddle(t *testing.T, nr *element, do, done chan bool) {
 }
 
 func fiddleAndAssertSort(t *testing.T, nr *element, do chan bool, ichan, rchan chan []c) {
-	<- do
+	<-do
 	num := 1000
 	var injected []c
 	var removed []c
@@ -76,8 +77,8 @@ func assertListy(t *testing.T, l *List, cmp []Thing) {
 	}
 	tmp := make([]Thing, len(cmp))
 	for ind, v := range cmp {
-		popped, _ := l.Pop() 
-		tmp[len(cmp) - ind - 1] = popped
+		popped, _ := l.Pop()
+		tmp[len(cmp)-ind-1] = popped
 		if !reflect.DeepEqual(v, popped) {
 			t.Errorf("element %v of %v should be %v but was %v", ind, l, v, popped)
 		}
@@ -97,7 +98,7 @@ func TestList(t *testing.T) {
 	l.Push("hehu")
 	assertListy(t, l, []Thing{"hehu", "knap", "plur"})
 	l.Push("blar")
-	assertListy(t, l, []Thing{"blar", "hehu","knap","plur"})
+	assertListy(t, l, []Thing{"blar", "hehu", "knap", "plur"})
 }
 
 func assertSlicey(t *testing.T, nr *element, cmp []Thing) {
@@ -117,15 +118,15 @@ func TestPushPop(t *testing.T) {
 	nr := new(element)
 	assertSlicey(t, nr, []Thing{nil})
 	nr.add("hej")
-	assertSlicey(t, nr, []Thing{nil,"hej"})
+	assertSlicey(t, nr, []Thing{nil, "hej"})
 	nr.add("haj")
-	assertSlicey(t, nr, []Thing{nil,"haj","hej"})
+	assertSlicey(t, nr, []Thing{nil, "haj", "hej"})
 	nr.add("hoj")
-	assertSlicey(t, nr, []Thing{nil,"hoj","haj","hej"})
+	assertSlicey(t, nr, []Thing{nil, "hoj", "haj", "hej"})
 	assertPop(t, nr, "hoj")
-	assertSlicey(t, nr, []Thing{nil,"haj","hej"})
+	assertSlicey(t, nr, []Thing{nil, "haj", "hej"})
 	assertPop(t, nr, "haj")
-	assertSlicey(t, nr, []Thing{nil,"hej"})
+	assertSlicey(t, nr, []Thing{nil, "hej"})
 	assertPop(t, nr, "hej")
 	assertSlicey(t, nr, []Thing{nil})
 	assertPop(t, nr, nil)
@@ -151,15 +152,15 @@ func TestConcPushPop(t *testing.T) {
 	<-done
 	<-done
 	<-done
-	assertSlicey(t, nr, []Thing{nil,"4","3","2","1"})
+	assertSlicey(t, nr, []Thing{nil, "4", "3", "2", "1"})
 }
 
 const ANY = "ANY VALUE"
 
 func searchTest(t *testing.T, nr *element, s c, l, n, r Thing) {
 	h := nr.search(s)
-	if (l != ANY && !reflect.DeepEqual(h.left.val(), l)) || 
-		(n != ANY && !reflect.DeepEqual(h.element.val(), n)) || 
+	if (l != ANY && !reflect.DeepEqual(h.left.val(), l)) ||
+		(n != ANY && !reflect.DeepEqual(h.element.val(), n)) ||
 		(r != ANY && !reflect.DeepEqual(h.right.val(), r)) {
 		t.Error(nr, ".search(", s, ") should produce ", l, n, r, " but produced ", h.left.val(), h.element.val(), h.right.val())
 	}
@@ -191,7 +192,7 @@ func TestSearch(t *testing.T) {
 	nr.add(c(5))
 	nr.add(c(4))
 	nr.add(c(3))
-	assertSlicey(t, nr, []Thing{&list_head, c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{&list_head, c(3), c(4), c(5), c(7), c(8), c(9)})
 	searchTest(t, nr, c(1), &list_head, nil, c(3))
 	searchTest(t, nr, c(2), &list_head, nil, c(3))
 	searchTest(t, nr, c(3), &list_head, c(3), c(4))
@@ -214,7 +215,7 @@ func TestVerify(t *testing.T) {
 	nr.inject(c(7))
 	nr.inject(c(4))
 	nr.inject(c(8))
-	assertSlicey(t, nr, []Thing{&list_head, c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{&list_head, c(3), c(4), c(5), c(7), c(8), c(9)})
 	if err := nr.verify(); err != nil {
 		t.Error(nr, "should verify as ok, got", err)
 	}
@@ -225,7 +226,7 @@ func TestVerify(t *testing.T) {
 	nr.add(c(7))
 	nr.add(c(4))
 	nr.add(c(8))
-	assertSlicey(t, nr, []Thing{&list_head, c(8),c(4),c(7),c(9),c(5),c(3)})
+	assertSlicey(t, nr, []Thing{&list_head, c(8), c(4), c(7), c(9), c(5), c(3)})
 	s := fmt.Sprintf("[%v 8 4 7 9 5 3] is badly ordered. The following elements are in the wrong order: 8,4; 9,5; 5,3", &list_head)
 	if err := nr.verify(); err.Error() != s {
 		t.Error(nr, "should have errors", s, "but had", err)
@@ -241,7 +242,7 @@ func TestInjectAndSearch(t *testing.T) {
 	nr.inject(c(7))
 	nr.inject(c(4))
 	nr.inject(c(8))
-	assertSlicey(t, nr, []Thing{&list_head, c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{&list_head, c(3), c(4), c(5), c(7), c(8), c(9)})
 	searchTest(t, nr, c(1), &list_head, nil, c(3))
 	searchTest(t, nr, c(2), &list_head, nil, c(3))
 	searchTest(t, nr, c(3), &list_head, c(3), c(4))
@@ -264,7 +265,7 @@ func TestConcInjectAndSearch(t *testing.T) {
 	nr.inject(c(7))
 	nr.inject(c(4))
 	nr.inject(c(8))
-	assertSlicey(t, nr, []Thing{&list_head, c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{&list_head, c(3), c(4), c(5), c(7), c(8), c(9)})
 	do := make(chan bool)
 	ichan := make(chan []c)
 	rchan := make(chan []c)
@@ -286,10 +287,10 @@ func TestConcInjectAndSearch(t *testing.T) {
 		searchTest(t, nr, c(9), c(8), c(9), nil)
 		searchTest(t, nr, c(10), c(9), nil, nil)
 		searchTest(t, nr, c(11), c(9), nil, nil)
-		injected = append(injected, <- ichan)
-		removed = append(removed, <- rchan)
+		injected = append(injected, <-ichan)
+		removed = append(removed, <-rchan)
 	}
-	assertSlicey(t, nr, []Thing{&list_head, c(3),c(4),c(5),c(7),c(8),c(9)})
+	assertSlicey(t, nr, []Thing{&list_head, c(3), c(4), c(5), c(7), c(8), c(9)})
 	imap := make(map[c]int)
 	for _, vals := range injected {
 		for _, val := range vals {

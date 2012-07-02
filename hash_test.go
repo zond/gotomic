@@ -1,13 +1,13 @@
 package gotomic
 
 import (
-	"testing"
-	"reflect"
 	"fmt"
-	"math/rand"
-	"runtime"
-	"time"
 	"hash/crc32"
+	"math/rand"
+	"reflect"
+	"runtime"
+	"testing"
+	"time"
 )
 
 func init() {
@@ -15,6 +15,7 @@ func init() {
 }
 
 type key string
+
 func (self key) HashCode() uint32 {
 	return crc32.ChecksumIEEE([]byte(self))
 }
@@ -44,7 +45,7 @@ func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
 }
 
 func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
-	<- do
+	<-do
 	cmp := make(map[Hashable]Thing)
 	n := 100000
 	for i := 0; i < n; i++ {
@@ -91,13 +92,14 @@ func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
 }
 
 type hashInt int
+
 func (self hashInt) HashCode() uint32 {
 	return uint32(self)
 }
 func (self hashInt) Equals(t Thing) bool {
 	if i, ok := t.(hashInt); ok {
 		return i == self
-	} 
+	}
 	return false
 }
 
@@ -114,7 +116,7 @@ func BenchmarkHash(b *testing.B) {
 }
 
 func action(b *testing.B, m *Hash, i int, do, done chan bool) {
-	<- do
+	<-do
 	for j := 0; j < i; j++ {
 		k := hashInt(j)
 		m.Put(k, j)
@@ -137,7 +139,7 @@ func BenchmarkHashConc(b *testing.B) {
 	close(do)
 	b.StartTimer()
 	for i := 0; i < runtime.NumCPU(); i++ {
-		<- done
+		<-done
 	}
 	b.StopTimer()
 	runtime.GOMAXPROCS(1)
@@ -217,7 +219,7 @@ func TestConcurrency(t *testing.T) {
 	}
 	close(do)
 	for i := 0; i < runtime.NumCPU(); i++ {
-		<- done
+		<-done
 	}
 	assertMappy(t, h, cmp)
 }
@@ -269,4 +271,3 @@ func TestPutDelete(t *testing.T) {
 	}
 	assertMappy(t, h, map[Hashable]Thing{})
 }
-
