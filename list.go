@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+type ListIterator func(t Thing)
+
 type hit struct {
 	left    *element
 	element *element
@@ -59,6 +61,15 @@ func (self *List) Pop() (rval Thing, ok bool) {
 		return rval, true
 	}
 	return nil, false
+}
+/*
+ Each will run i on each element.
+ */
+func (self *List) Each(i ListIterator) {
+	n := self.element.next()
+	if n != nil {
+		n.each(i)
+	}
 }
 func (self *List) String() string {
 	return fmt.Sprint(self.ToSlice())
@@ -146,6 +157,13 @@ func (self *element) next() *element {
 		}
 	}
 	return nil
+}
+func (self *element) each(i ListIterator) {
+	n := self
+	for n != nil {
+		i(n.value)
+		n = n.next()
+	}
 }
 func (self *element) val() Thing {
 	if self == nil {

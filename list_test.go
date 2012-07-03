@@ -166,6 +166,24 @@ func searchTest(t *testing.T, nr *element, s c, l, n, r Thing) {
 	}
 }
 
+func TestListEach(t *testing.T) {
+	nr := new(element)
+	nr.add("h")
+	nr.add("g")
+	nr.add("f")
+	nr.add("d")
+	nr.add("c")
+	nr.add("b")
+	var a []Thing
+	nr.each(func(t Thing) {
+		a = append(a, t)
+	})
+	exp := []Thing{nil, "b", "c", "d", "f", "g", "h"}
+	if !reflect.DeepEqual(a, exp) {
+		t.Error(a, "should be", exp)
+	}
+}
+
 func TestPushBefore(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(element)

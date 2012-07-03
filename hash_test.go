@@ -224,6 +224,26 @@ func TestConcurrency(t *testing.T) {
 	assertMappy(t, h, cmp)
 }
 
+func TestHashEach(t *testing.T) {
+	h := NewHash()
+	h.Put(key("a"), "1")
+	h.Put(key("b"), "2")
+	h.Put(key("c"), "3")
+	h.Put(key("d"), "4")
+	cmp := make(map[Hashable]Thing)
+	cmp[key("a")] = "1"
+	cmp[key("b")] = "2"
+	cmp[key("c")] = "3"
+	cmp[key("d")] = "4"
+	m := make(map[Hashable]Thing)
+	h.Each(func(k Hashable, v Thing) {
+		m[k] = v
+	})
+	if !reflect.DeepEqual(cmp, m) {
+		t.Error(m, "should be", cmp)
+	}
+}
+
 func TestPutDelete(t *testing.T) {
 	h := NewHash()
 	if v := h.Delete(key("e")); v != nil {

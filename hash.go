@@ -10,6 +10,8 @@ import (
 const MAX_EXPONENT = 32
 const DEFAULT_LOAD_FACTOR = 0.5
 
+type HashIterator func(k Hashable, v Thing)
+
 type hashHit hit
 
 func (self *hashHit) search(cmp *entry) (rval *hashHit) {
@@ -118,7 +120,16 @@ func NewHash() *Hash {
 func (self *Hash) Size() int {
 	return int(atomic.LoadInt64(&self.size))
 }
-
+/*
+ Each will run i on each key and value.
+ */
+func (self *Hash) Each(i HashIterator) {
+	self.getBucketByHashCode(0).each(func(t Thing) {
+		if e := t.(*entry); e.real() {
+			i(e.key, e.val())
+		}
+	})
+}
 /*
  Verify the integrity of the Hash. Used mostly in my own tests but go ahead and call it if you fear corruption.
 */
@@ -148,13 +159,9 @@ func (self *Hash) Verify() error {
 */
 func (self *Hash) ToMap() map[Hashable]Thing {
 	rval := make(map[Hashable]Thing)
-	element := self.getBucketByHashCode(0)
-	for element != nil {
-		if e := element.value.(*entry); e.real() {
-			rval[e.key] = e.val()
-		}
-		element = element.next()
-	}
+	self.Each(func(k Hashable, v Thing) {
+		rval[k] = v
+	})
 	return rval
 }
 func (self *Hash) isBucket(n *element) (isBucket bool, index, superIndex, subIndex uint32) {
