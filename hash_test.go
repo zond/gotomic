@@ -2,7 +2,6 @@ package gotomic
 
 import (
 	"fmt"
-	"hash/crc32"
 	"math/rand"
 	"reflect"
 	"runtime"
@@ -12,18 +11,6 @@ import (
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-}
-
-type key string
-
-func (self key) HashCode() uint32 {
-	return crc32.ChecksumIEEE([]byte(self))
-}
-func (self key) Equals(t Thing) bool {
-	if s, ok := t.(key); ok {
-		return s == self
-	}
-	return false
 }
 
 func assertMappy(t *testing.T, h *Hash, cmp map[Hashable]Thing) {
@@ -49,7 +36,7 @@ func fiddleHash(t *testing.T, h *Hash, s string, do, done chan bool) {
 	cmp := make(map[Hashable]Thing)
 	n := 100000
 	for i := 0; i < n; i++ {
-		k := key(fmt.Sprint(s, i))
+		k := StringKey(fmt.Sprint(s, i))
 		v := fmt.Sprint(k, "value")
 		if hv := h.Put(k, v); hv != nil {
 			t.Errorf("1 Put(%v, %v) should produce nil but produced %v", k, v, hv)
@@ -148,38 +135,38 @@ func BenchmarkHashConc(b *testing.B) {
 func TestPutIfPresent(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
-	if h.PutIfPresent(key("k"), key("v"), key("blabla")) {
+	if h.PutIfPresent(StringKey("k"), StringKey("v"), StringKey("blabla")) {
 		t.Error(h, "should not contain 'k': 'v'")
 	}
 	assertMappy(t, h, map[Hashable]Thing{})
-	if h.Put(key("k"), key("v")) != nil {
+	if h.Put(StringKey("k"), StringKey("v")) != nil {
 		t.Error(h, "should not contain 'k': 'v'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v")})
-	if h.PutIfPresent(key("k"), key("v3"), key("v2")) {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): StringKey("v")})
+	if h.PutIfPresent(StringKey("k"), StringKey("v3"), StringKey("v2")) {
 		t.Error(h, "should not contain 'k': 'v2'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v")})
-	if !h.PutIfPresent(key("k"), key("v2"), key("v")) {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): StringKey("v")})
+	if !h.PutIfPresent(StringKey("k"), StringKey("v2"), StringKey("v")) {
 		t.Error(h, "should contain 'k': 'v'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v2")})
-	if h.PutIfPresent(key("k"), key("v2"), key("v")) {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): StringKey("v2")})
+	if h.PutIfPresent(StringKey("k"), StringKey("v2"), StringKey("v")) {
 		t.Error(h, "should not contain 'k': 'v'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v2")})
-	if !h.PutIfPresent(key("k"), key("v3"), key("v2")) {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): StringKey("v2")})
+	if !h.PutIfPresent(StringKey("k"), StringKey("v3"), StringKey("v2")) {
 		t.Error(h, "should contain 'k': 'v2'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): key("v3")})
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): StringKey("v3")})
 }
 
 func TestNilValues(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
-	h.Put(key("k"), nil)
-	assertMappy(t, h, map[Hashable]Thing{key("k"): nil})
-	v, ok := h.Get(key("k"))
+	h.Put(StringKey("k"), nil)
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): nil})
+	v, ok := h.Get(StringKey("k"))
 	if !ok {
 		t.Error(h, "should contain 'k'")
 	}
@@ -191,14 +178,14 @@ func TestNilValues(t *testing.T) {
 func TestPutIfMissing(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
-	if !h.PutIfMissing(key("k"), "v") {
+	if !h.PutIfMissing(StringKey("k"), "v") {
 		t.Error(h, "should not contain 'k'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): "v"})
-	if h.PutIfMissing(key("k"), "v") {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): "v"})
+	if h.PutIfMissing(StringKey("k"), "v") {
 		t.Error(h, "should contain 'k'")
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("k"): "v"})
+	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): "v"})
 }
 
 func TestConcurrency(t *testing.T) {
@@ -206,7 +193,7 @@ func TestConcurrency(t *testing.T) {
 	h := NewHash()
 	cmp := make(map[Hashable]Thing)
 	for i := 0; i < 1000; i++ {
-		k := key(fmt.Sprint("key", i))
+		k := StringKey(fmt.Sprint("StringKey", i))
 		v := fmt.Sprint("value", i)
 		h.Put(k, v)
 		cmp[k] = v
@@ -226,15 +213,15 @@ func TestConcurrency(t *testing.T) {
 
 func TestHashEach(t *testing.T) {
 	h := NewHash()
-	h.Put(key("a"), "1")
-	h.Put(key("b"), "2")
-	h.Put(key("c"), "3")
-	h.Put(key("d"), "4")
+	h.Put(StringKey("a"), "1")
+	h.Put(StringKey("b"), "2")
+	h.Put(StringKey("c"), "3")
+	h.Put(StringKey("d"), "4")
 	cmp := make(map[Hashable]Thing)
-	cmp[key("a")] = "1"
-	cmp[key("b")] = "2"
-	cmp[key("c")] = "3"
-	cmp[key("d")] = "4"
+	cmp[StringKey("a")] = "1"
+	cmp[StringKey("b")] = "2"
+	cmp[StringKey("c")] = "3"
+	cmp[StringKey("d")] = "4"
 	m := make(map[Hashable]Thing)
 	h.Each(func(k Hashable, v Thing) {
 		m[k] = v
@@ -246,47 +233,47 @@ func TestHashEach(t *testing.T) {
 
 func TestPutDelete(t *testing.T) {
 	h := NewHash()
-	if v := h.Delete(key("e")); v != nil {
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
 	assertMappy(t, h, map[Hashable]Thing{})
-	h.Put(key("a"), "b")
-	if v := h.Delete(key("e")); v != nil {
+	h.Put(StringKey("a"), "b")
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("a"): "b"})
-	h.Put(key("a"), "b")
-	if v := h.Delete(key("e")); v != nil {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("a"): "b"})
+	h.Put(StringKey("a"), "b")
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("a"): "b"})
-	h.Put(key("c"), "d")
-	if v := h.Delete(key("e")); v != nil {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("a"): "b"})
+	h.Put(StringKey("c"), "d")
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("a"): "b", key("c"): "d"})
-	if v := h.Delete(key("a")); v != "b" {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("a"): "b", StringKey("c"): "d"})
+	if v := h.Delete(StringKey("a")); v != "b" {
 		t.Error(h, "should be able to delete 'a' but got ", v)
 	}
-	if v := h.Delete(key("e")); v != nil {
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("c"): "d"})
-	if v := h.Delete(key("a")); v != nil {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("c"): "d"})
+	if v := h.Delete(StringKey("a")); v != nil {
 		t.Error(h, "should not be able to delete 'a' but got ", v)
 	}
-	if v := h.Delete(key("e")); v != nil {
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
-	assertMappy(t, h, map[Hashable]Thing{key("c"): "d"})
-	if v := h.Delete(key("c")); v != "d" {
+	assertMappy(t, h, map[Hashable]Thing{StringKey("c"): "d"})
+	if v := h.Delete(StringKey("c")); v != "d" {
 		t.Error(h, "should be able to delete 'c' but got ", v)
 	}
 	assertMappy(t, h, map[Hashable]Thing{})
-	if v := h.Delete(key("c")); v != nil {
+	if v := h.Delete(StringKey("c")); v != nil {
 		t.Error(h, "should not be able to delete 'c' but got ", v)
 	}
-	if v := h.Delete(key("e")); v != nil {
+	if v := h.Delete(StringKey("e")); v != nil {
 		t.Error(h, "should not be able to delete 'e' but got ", v)
 	}
 	assertMappy(t, h, map[Hashable]Thing{})

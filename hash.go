@@ -3,6 +3,7 @@ package gotomic
 import (
 	"bytes"
 	"fmt"
+	"hash/crc32"
 	"sync/atomic"
 	"unsafe"
 )
@@ -50,6 +51,34 @@ type Equalable interface {
 type Hashable interface {
 	Equalable
 	HashCode() uint32
+}
+
+/*
+ Convenience type to simplify using ints as keys in a Hash
+ */
+type IntKey int
+func (self IntKey) HashCode() uint32 {
+	return uint32(self)
+}
+func (self IntKey) Equals(t Thing) bool {
+	if ik, ok := t.(IntKey); ok {
+		return int(self) == int(ik)
+	} 
+	return false
+}
+
+/*
+ Convenience type to simplify using strings as keys in a Hash
+ */
+type StringKey string
+func (self StringKey) HashCode() uint32 {
+	return crc32.ChecksumIEEE([]byte(self))
+}
+func (self StringKey) Equals(t Thing) bool {
+	if sk, ok := t.(StringKey); ok {
+		return string(self) == string(sk)
+	} 
+	return false
 }
 
 type entry struct {
