@@ -32,7 +32,9 @@ c)
     BenchmarkHash	  500000	      4410 ns/op
     BenchmarkHashConc	  500000	      8143 ns/op
 
-Conclusion: As expected a) is by far the fastest mapping, and unfortunately it seems that even the naive RWMutex wrapped native map b) is more efficient (at least in this benchmark) than c). But perhaps there are other usecases where the non blocking version c) is worth the effort? I suspect that in extremely parallel and write intensive situations the non blocking Hash may still shine.
+Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive RWMutex wrapped native map b) is much faster at single thread operation, and about as efficient in multi thread operation, compared to c).
+
+I find it likely that c) is more efficient than b) at higher levels of concurrency, but for regular uses an RWMutex wrapped `map` is probably a safer bet.
 
 ## Usage
 
