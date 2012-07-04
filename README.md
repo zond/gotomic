@@ -10,9 +10,9 @@ The `Hash` type is implemented using [Split-Ordered Lists: Lock-Free Extensible 
 
 ## Performance
 
-On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types wrapped by a `channel` and `goroutine`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
+On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
 
-The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L82 and the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L116.
+The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L83 and the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L116.
 
 The TL;DR of it all is that the benchmark sets `runtime.GOMAXPROCS` to be `runtime.NumCPU()`, and starts that number of `goroutine`s that just mutates and reads the tested mapping.
 
@@ -24,15 +24,15 @@ a)
 
 b)
 
-    BenchmarkMyMapConc	   50000	     54408 ns/op
-    BenchmarkMyMap	 1000000	      2885 ns/op
+    BenchmarkMyMapConc	  200000	     10694 ns/op
+    BenchmarkMyMap	 1000000	      1427 ns/op
 
 c)
 
-    BenchmarkHash	  500000	      4170 ns/op
-    BenchmarkHashConc	  500000	      9225 ns/op
+    BenchmarkHash	  500000	      4410 ns/op
+    BenchmarkHashConc	  500000	      8143 ns/op
 
-Notice that as expected a) is by far the fastest mapping, but if you want a thread safe mapping (and yeah, _Don't communicate by sharing memory; share memory by communicating_, but sometimes it really is easier to have a global mapping) the Non-Blocking mapping is a few times faster than the `channel`-wrapped native `map`.
+Conclusion: As expected a) is by far the fastest mapping, and unfortunately it seems that even the naive RWMutex wrapped native map b) is more efficient (at least in this benchmark) than c). But perhaps there are other usecases where the non blocking version c) is worth the effort? I suspect that in extremely parallel and write intensive situations the non blocking Hash may still shine.
 
 ## Usage
 

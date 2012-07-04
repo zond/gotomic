@@ -103,14 +103,11 @@ func BenchmarkHash(b *testing.B) {
 }
 
 func action(b *testing.B, m *Hash, i int, do, done chan bool) {
-	<-do
+	<- do
 	for j := 0; j < i; j++ {
 		k := hashInt(j)
-		m.Put(k, j)
-		l, _ := m.Get(k)
-		if l != j {
-			b.Error("should be same value")
-		}
+		m.Put(k, rand.Int())
+		m.Get(k)
 	}
 	done <- true
 }
