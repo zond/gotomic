@@ -55,29 +55,31 @@ type Hashable interface {
 
 /*
  Convenience type to simplify using ints as keys in a Hash
- */
+*/
 type IntKey int
+
 func (self IntKey) HashCode() uint32 {
 	return uint32(self)
 }
 func (self IntKey) Equals(t Thing) bool {
 	if ik, ok := t.(IntKey); ok {
 		return int(self) == int(ik)
-	} 
+	}
 	return false
 }
 
 /*
  Convenience type to simplify using strings as keys in a Hash
- */
+*/
 type StringKey string
+
 func (self StringKey) HashCode() uint32 {
 	return crc32.ChecksumIEEE([]byte(self))
 }
 func (self StringKey) Equals(t Thing) bool {
 	if sk, ok := t.(StringKey); ok {
 		return string(self) == string(sk)
-	} 
+	}
 	return false
 }
 
@@ -149,9 +151,10 @@ func NewHash() *Hash {
 func (self *Hash) Size() int {
 	return int(atomic.LoadInt64(&self.size))
 }
+
 /*
  Each will run i on each key and value.
- */
+*/
 func (self *Hash) Each(i HashIterator) {
 	self.getBucketByHashCode(0).each(func(t Thing) {
 		if e := t.(*entry); e.real() {
@@ -159,6 +162,7 @@ func (self *Hash) Each(i HashIterator) {
 		}
 	})
 }
+
 /*
  Verify the integrity of the Hash. Used mostly in my own tests but go ahead and call it if you fear corruption.
 */
@@ -200,7 +204,6 @@ func (self *Hash) isBucket(n *element) (isBucket bool, index, superIndex, subInd
 	subBucket := *(*[]unsafe.Pointer)(self.buckets[superIndex])
 	if subBucket[subIndex] == unsafe.Pointer(n) {
 		isBucket = true
-		return
 	}
 	return
 }
@@ -237,16 +240,16 @@ func (self *Hash) GetHC(hashCode uint32, k Hashable) (rval Thing, ok bool) {
 	bucket := self.getBucketByHashCode(testEntry.hashCode)
 	hit := (*hashHit)(bucket.search(testEntry))
 	if hit2 := hit.search(testEntry); hit2.element != nil {
-		return hit2.element.value.(*entry).val(), true
+		rval = hit2.element.value.(*entry).val()
+		ok = true
 	}
-	return nil, false
-
+	return
 }
 
 /*
  Get returns the value at k and whether it was present in the Hash.
 */
-func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
+func (self *Hash) Get(k Hashable) (Thing, bool) {
 	return self.GetHC(k.HashCode(), k)
 }
 
@@ -255,7 +258,7 @@ func (self *Hash) Get(k Hashable) (rval Thing, ok bool) {
 
  Use this when you already have the hash code and don't want to force gotomic to calculate it again.
 */
-func (self *Hash) DeleteHC(hashCode uint32, k Hashable) (rval Thing) {
+func (self *Hash) DeleteHC(hashCode uint32, k Hashable) (rval Thing, ok bool) {
 	testEntry := newRealEntryWithHashCode(k, nil, hashCode)
 	for {
 		bucket := self.getBucketByHashCode(testEntry.hashCode)
@@ -263,11 +266,11 @@ func (self *Hash) DeleteHC(hashCode uint32, k Hashable) (rval Thing) {
 		if hit2 := hit.search(testEntry); hit2.element != nil {
 			if hit2.element.doRemove() {
 				rval = hit2.element.value.(*entry).val()
+				ok = true
 				self.addSize(-1)
 				break
 			}
 		} else {
-			rval = nil
 			break
 		}
 	}
@@ -277,39 +280,40 @@ func (self *Hash) DeleteHC(hashCode uint32, k Hashable) (rval Thing) {
 /*
  Delete removes k from the Hash and returns any value it removed.
 */
-func (self *Hash) Delete(k Hashable) (rval Thing) {
+func (self *Hash) Delete(k Hashable) (Thing, bool) {
 	return self.DeleteHC(k.HashCode(), k)
 }
 
 /*
  PutIfMissing will insert v under k if k contains expected in the Hash, and return whether it inserted anything.
 */
-func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) bool {
+func (self *Hash) PutIfPresent(k Hashable, v Thing, expected Equalable) (rval bool) {
 	newEntry := newRealEntry(k, v)
 	for {
 		bucket := self.getBucketByHashCode(newEntry.hashCode)
 		hit := (*hashHit)(bucket.search(newEntry))
 		if hit2 := hit.search(newEntry); hit2.element == nil {
-			return false
+			break
 		} else {
 			oldEntry := hit2.element.value.(*entry)
 			oldValuePtr := atomic.LoadPointer(&oldEntry.value)
 			if expected.Equals(*(*Thing)(oldValuePtr)) {
 				if atomic.CompareAndSwapPointer(&oldEntry.value, oldValuePtr, unsafe.Pointer(newEntry.value)) {
-					return true
+					rval = true
+					break
 				}
 			} else {
-				return false
+				break
 			}
 		}
 	}
-	return false
+	return
 }
 
 /*
  PutIfMissing will insert v under k if k was missing from the Hash, and return whether it inserted anything.
 */
-func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
+func (self *Hash) PutIfMissing(k Hashable, v Thing) (rval bool) {
 	newEntry := newRealEntry(k, v)
 	alloc := &element{}
 	for {
@@ -321,18 +325,18 @@ func (self *Hash) PutIfMissing(k Hashable, v Thing) bool {
 				return true
 			}
 		} else {
-			return false
+			break
 		}
 	}
-	return false
+	return
 }
 
 /*
- PutHC will put k and v in the Hash using hashCode and return any overwritten value.
+ PutHC will put k and v in the Hash using hashCode and return the overwritten value and whether any value was overwritten.
 
  Use this when you already have the hash code and don't want to force gotomic to calculate it again.
 */
-func (self *Hash) PutHC(hashCode uint32, k Hashable, v Thing) (rval Thing) {
+func (self *Hash) PutHC(hashCode uint32, k Hashable, v Thing) (rval Thing, ok bool) {
 	newEntry := newRealEntryWithHashCode(k, v, hashCode)
 	alloc := &element{}
 	for {
@@ -341,23 +345,23 @@ func (self *Hash) PutHC(hashCode uint32, k Hashable, v Thing) (rval Thing) {
 		if hit2 := hit.search(newEntry); hit2.element == nil {
 			if hit2.left.addBefore(newEntry, alloc, hit2.right) {
 				self.addSize(1)
-				rval = nil
-				return
+				break
 			}
 		} else {
 			oldEntry := hit2.element.value.(*entry)
 			rval = oldEntry.val()
+			ok = true
 			atomic.StorePointer(&oldEntry.value, newEntry.value)
-			return
+			break
 		}
 	}
 	return
 }
 
 /*
- Put k and v in the Hash and return any overwritten value.
+ Put k and v in the Hash and return the overwritten value and whether any value was overwritten.
 */
-func (self *Hash) Put(k Hashable, v Thing) (rval Thing) {
+func (self *Hash) Put(k Hashable, v Thing) (rval Thing, ok bool) {
 	return self.PutHC(k.HashCode(), k, v)
 }
 func (self *Hash) addSize(i int) {

@@ -62,9 +62,10 @@ func (self *List) Pop() (rval Thing, ok bool) {
 	}
 	return nil, false
 }
+
 /*
  Each will run i on each element.
- */
+*/
 func (self *List) Each(i ListIterator) {
 	n := self.element.next()
 	if n != nil {
