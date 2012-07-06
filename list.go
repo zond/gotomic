@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+var deletedElement = "deleted"
+
 type ListIterator func(t Thing)
 
 type hit struct {
@@ -104,19 +106,6 @@ func (self *List) Inject(c Comparable) {
 	atomic.AddInt64(&self.size, 1)
 }
 
-/*
- Note that if the pointer has the deleted flag set, it is the element containing the pointer that is deleted!
-*/
-func isDeleted(p unsafe.Pointer) bool {
-	return uintptr(p)&1 == 1
-}
-func deleted(p unsafe.Pointer) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(p) | 1)
-}
-func normal(p unsafe.Pointer) unsafe.Pointer {
-	return unsafe.Pointer(uintptr(p) &^ 1)
-}
-
 type element struct {
 	/*
 	 The next element in the list. If this pointer has the deleted flag set it means THIS element, not the next one, is deleted.
@@ -127,36 +116,16 @@ type element struct {
 
 func (self *element) next() *element {
 	next := atomic.LoadPointer(&self.Pointer)
-	nextNormal := normal(next)
-	for nextNormal != nil {
-		/*
-		 If the pointer of the next element is marked as deleted, that means the next element is supposed to be GONE
-		*/
-		if nextPointer := atomic.LoadPointer(&(*element)(nextNormal).Pointer); isDeleted(nextPointer) {
-			/*
-			 If OUR pointer is marked as deleted, that means WE are supposed to be gone
-			*/
-			if isDeleted(next) {
-				/*
-				 .. which means that we can steal the pointer of the next element right away,
-				 it points to the right place AND it is marked as deleted.
-				*/
-				atomic.CompareAndSwapPointer(&self.Pointer, next, nextPointer)
-			} else {
-				/*
-				 .. if not, we have to remove the marking on the pointer before we steal it.
-				*/
-				atomic.CompareAndSwapPointer(&self.Pointer, next, normal(nextPointer))
-			}
+	for next != nil {
+		nextElement := (*element)(next);
+		if sp, ok := nextElement.value.(*string); ok && sp == &deletedElement {
+			return nextElement.next()
+		}
+		if nextElement.isDeleted() {
+			atomic.CompareAndSwapPointer(&self.Pointer, next, unsafe.Pointer(nextElement.next()))
 			next = atomic.LoadPointer(&self.Pointer)
-			nextNormal = normal(next)
 		} else {
-			/*
-			 If the next element is NOT deleted, then we simply return a pointer to it, and make
-			 damn sure that the pointer is a working one even if we are deleted (and, therefore,
-			 our pointer is marked as deleted).
-			*/
-			return (*element)(nextNormal)
+			return nextElement
 		}
 	}
 	return nil
@@ -182,14 +151,32 @@ func (self *element) Describe() string {
 		return fmt.Sprint(nil)
 	}
 	deleted := ""
-	if isDeleted(self.Pointer) {
+	if sp, ok := self.value.(*string); ok && sp == &deletedElement {
 		deleted = " (x)"
 	}
 	return fmt.Sprintf("%#v%v -> %v", self, deleted, self.next().Describe())
 }
+func (self *element) isDeleted() bool {
+	next := atomic.LoadPointer(&self.Pointer)
+	if next == nil {
+		return false
+	}
+	if sp, ok := (*element)(next).value.(*string); ok && sp == &deletedElement {
+		return true
+	}
+	return false
+}
 func (self *element) add(c Thing) {
 	alloc := &element{}
-	for !self.addBefore(c, alloc, self.next()) {
+	for {
+		if self.isDeleted() {
+			self.next().add(c)
+			return
+		}
+		if self.addBefore(c, alloc, self.next()) {
+			return
+		}
+		
 	}
 }
 func (self *element) addBefore(t Thing, allocatedElement, before *element) bool {
@@ -198,11 +185,7 @@ func (self *element) addBefore(t Thing, allocatedElement, before *element) bool 
 	}
 	allocatedElement.value = t
 	allocatedElement.Pointer = unsafe.Pointer(before)
-	newPointer := unsafe.Pointer(allocatedElement)
-	if isDeleted(self.Pointer) {
-		newPointer = deleted(newPointer)
-	}
-	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(before), newPointer)
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(before), unsafe.Pointer(allocatedElement))
 }
 
 /*
@@ -312,20 +295,13 @@ func (self *element) verify() (err error) {
 	return fmt.Errorf("%v is badly ordered. The following elements are in the wrong order: %v", self, string(buffer.Bytes()))
 
 }
-func (self *element) doRemove() bool {
-	ptr := self.Pointer
-	if atomic.CompareAndSwapPointer(&self.Pointer, normal(ptr), deleted(ptr)) {
-		self.next()
-		return true
-	}
-	return false
+func (self *element) doRemove() {
+	self.add(&deletedElement)
 }
 func (self *element) remove() (rval Thing, ok bool) {
 	n := self.next()
-	for n != nil && !n.doRemove() {
-		n = self.next()
-	}
 	if n != nil {
+		n.doRemove()
 		return n.value, true
 	}
 	return nil, false
