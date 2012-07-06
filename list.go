@@ -93,7 +93,7 @@ func (self *List) Search(c Comparable) Thing {
 	return nil
 }
 func (self *List) Size() int {
-	return int(self.size)
+	return int(atomic.LoadInt64(&self.size))
 }
 
 /*
@@ -127,11 +127,12 @@ type element struct {
 
 func (self *element) next() *element {
 	next := atomic.LoadPointer(&self.Pointer)
-	for next != nil {
+	nextNormal := normal(next)
+	for nextNormal != nil {
 		/*
 		 If the pointer of the next element is marked as deleted, that means the next element is supposed to be GONE
 		*/
-		if nextPointer := atomic.LoadPointer(&(*element)(normal(next)).Pointer); isDeleted(nextPointer) {
+		if nextPointer := atomic.LoadPointer(&(*element)(nextNormal).Pointer); isDeleted(nextPointer) {
 			/*
 			 If OUR pointer is marked as deleted, that means WE are supposed to be gone
 			*/
@@ -148,13 +149,14 @@ func (self *element) next() *element {
 				atomic.CompareAndSwapPointer(&self.Pointer, next, normal(nextPointer))
 			}
 			next = atomic.LoadPointer(&self.Pointer)
+			nextNormal = normal(next)
 		} else {
 			/*
 			 If the next element is NOT deleted, then we simply return a pointer to it, and make
 			 damn sure that the pointer is a working one even if we are deleted (and, therefore,
 			 our pointer is marked as deleted).
 			*/
-			return (*element)(normal(next))
+			return (*element)(nextNormal)
 		}
 	}
 	return nil
@@ -312,7 +314,11 @@ func (self *element) verify() (err error) {
 }
 func (self *element) doRemove() bool {
 	ptr := self.Pointer
-	return atomic.CompareAndSwapPointer(&self.Pointer, normal(ptr), deleted(ptr))
+	if atomic.CompareAndSwapPointer(&self.Pointer, normal(ptr), deleted(ptr)) {
+		self.next()
+		return true
+	}
+	return false
 }
 func (self *element) remove() (rval Thing, ok bool) {
 	n := self.next()
