@@ -337,6 +337,7 @@ func (self *element) remove() (rval Thing, ok bool) {
 		 We managed to remove next!
 		 */
 		if n.doRemove() {
+			self.next()
 			rval = n.value
 			ok = true
 			break

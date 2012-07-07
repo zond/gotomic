@@ -264,11 +264,12 @@ func (self *Hash) DeleteHC(hashCode uint32, k Hashable) (rval Thing, ok bool) {
 		bucket := self.getBucketByHashCode(testEntry.hashCode)
 		hit := (*hashHit)(bucket.search(testEntry))
 		if hit2 := hit.search(testEntry); hit2.element != nil {
-			hit2.element.doRemove()
-			rval = hit2.element.value.(*entry).val()
-			ok = true
-			self.addSize(-1)
-			break
+			if hit2.element.doRemove() {
+				rval = hit2.element.value.(*entry).val()
+				ok = true
+				self.addSize(-1)
+				break
+			}
 		} else {
 			break
 		}
