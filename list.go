@@ -166,18 +166,18 @@ func (self *element) isDeleted() bool {
 	}
 	return false
 }
-func (self *element) add(c Thing) {
+func (self *element) add(c Thing) (rval bool) {
 	alloc := &element{}
 	for {
 		if self.isDeleted() {
-			self.next().add(c)
-			return
+			break
 		}
 		if self.addBefore(c, alloc, self.next()) {
-			return
+			rval = true
+			break
 		}
-		
 	}
+	return
 }
 func (self *element) addBefore(t Thing, allocatedElement, before *element) bool {
 	if self.next() != before {
@@ -295,14 +295,21 @@ func (self *element) verify() (err error) {
 	return fmt.Errorf("%v is badly ordered. The following elements are in the wrong order: %v", self, string(buffer.Bytes()))
 
 }
-func (self *element) doRemove() {
-	self.add(&deletedElement)
+func (self *element) doRemove() bool {
+	return self.add(&deletedElement)
 }
 func (self *element) remove() (rval Thing, ok bool) {
 	n := self.next()
-	if n != nil {
-		n.doRemove()
-		return n.value, true
+	for {
+		if n == nil {
+			break
+		}
+		if n.doRemove() {
+			rval = n.value
+			ok = true
+			break
+		}
+		n = self.next()
 	}
-	return nil, false
+	return
 }

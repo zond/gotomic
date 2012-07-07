@@ -38,7 +38,7 @@ func fiddle(t *testing.T, nr *element, do, done chan bool) {
 	}
 	for i := 0; i < num; i++ {
 		if x, ok := nr.remove(); !ok {
-			t.Errorf("%v should pop something, but got %v", x)
+			t.Errorf("%v should pop something, but got %v", nr, x)
 		}
 	}
 	done <- true
