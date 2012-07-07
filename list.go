@@ -186,9 +186,15 @@ func (self *element) isDeleted() bool {
 func (self *element) add(c Thing) (rval bool) {
 	alloc := &element{}
 	for {
+		/*
+		 If we are deleted then we do not allow adding new children.
+		 */
 		if self.isDeleted() {
 			break
 		}
+		/*
+		 If we succeed in adding before our perceived next, just return true.
+		 */
 		if self.addBefore(c, alloc, self.next()) {
 			rval = true
 			break
@@ -312,15 +318,24 @@ func (self *element) verify() (err error) {
 	return fmt.Errorf("%v is badly ordered. The following elements are in the wrong order: %v", self, string(buffer.Bytes()))
 
 }
+/*
+ Just a shorthand to hide the inner workings of our removal mechanism.
+*/
 func (self *element) doRemove() bool {
 	return self.add(&deletedElement)
 }
 func (self *element) remove() (rval Thing, ok bool) {
 	n := self.next()
 	for {
+		/*
+		 No children to remove.
+		 */
 		if n == nil {
 			break
 		}
+		/*
+		 We managed to remove next!
+		 */
 		if n.doRemove() {
 			rval = n.value
 			ok = true
