@@ -25,6 +25,14 @@ func tWrite(t *testing.T, tr *Transaction, h *Handle) Thing {
 	return x
 }
 
+func tRead(t *testing.T, tr *Transaction, h *Handle) Thing {
+	x, err := tr.Read(h)
+	if err != nil {
+		t.Errorf("%v should be able to read %v, but got %v", tr, h, err)
+	}
+	return x
+}
+
 func TestIsolation(t *testing.T) {
 	h := NewHandle(&testNode{"a", nil, nil})
 	tr := NewTransaction()
@@ -64,9 +72,114 @@ func TestReadBreakage(t *testing.T) {
 	}
 }
 
+func TestDiffTrans1(t *testing.T) {
+	tr1 := NewTransaction()
+	tr2 := NewTransaction()
+	h1 := NewHandle(&testNode{"a", nil, nil})
+	h2 := NewHandle(&testNode{"b", nil, nil})
+	h3 := NewHandle(&testNode{"c", nil, nil})
+	n11 := tRead(t, tr1, h1).(*testNode)
+	n12 := tRead(t, tr1, h2).(*testNode)
+	n22 := tRead(t, tr2, h2).(*testNode)
+	n23 := tRead(t, tr2, h3).(*testNode)
+	if n11.value != "a" {
+		t.Error("bad value")
+	}
+	if n12.value != "b" {
+		t.Error("bad value")
+	}
+	if n22.value != "b" {
+		t.Error("bad value")
+	}
+	if n23.value != "c" {
+		t.Error("bad value")
+	}
+	if !tr1.Commit() {
+		t.Error("should commit")
+	}
+	if !tr2.Commit() {
+		t.Error("should commit")
+	}
+}
+
+func TestDiffTrans2(t *testing.T) {
+	tr1 := NewTransaction()
+	tr2 := NewTransaction()
+	h1 := NewHandle(&testNode{"a", nil, nil})
+	h2 := NewHandle(&testNode{"b", nil, nil})
+	h3 := NewHandle(&testNode{"c", nil, nil})
+	n11 := tWrite(t, tr1, h1).(*testNode)
+	n12 := tRead(t, tr1, h2).(*testNode)
+	n22 := tRead(t, tr2, h2).(*testNode)
+	n23 := tWrite(t, tr2, h3).(*testNode)
+	if n11.value != "a" {
+		t.Error("bad value")
+	}
+	if n12.value != "b" {
+		t.Error("bad value")
+	}
+	if n22.value != "b" {
+		t.Error("bad value")
+	}
+	if n23.value != "c" {
+		t.Error("bad value")
+	}
+	n11.value = "a2"
+	n23.value = "c2"
+	if !tr1.Commit() {
+		t.Error("should commit")
+	}
+	if !tr2.Commit() {
+		t.Error("should commit")
+	}
+	tr3 := NewTransaction()
+	if tRead(t, tr3, h1).(*testNode).value != "a2" {
+		t.Error("bad value")
+	}
+	if tRead(t, tr3, h3).(*testNode).value != "c2" {
+		t.Error("bad value")
+	}
+}
+
+func TestDiffTrans3(t *testing.T) {
+	tr1 := NewTransaction()
+	tr2 := NewTransaction()
+	h1 := NewHandle(&testNode{"a", nil, nil})
+	h2 := NewHandle(&testNode{"b", nil, nil})
+	h3 := NewHandle(&testNode{"c", nil, nil})
+	n11 := tWrite(t, tr1, h1).(*testNode)
+	n12 := tWrite(t, tr1, h2).(*testNode)
+	n22 := tWrite(t, tr2, h2).(*testNode)
+	n23 := tWrite(t, tr2, h3).(*testNode)
+	if n11.value != "a" {
+		t.Error("bad value")
+	}
+	if n12.value != "b" {
+		t.Error("bad value")
+	}
+	if n22.value != "b" {
+		t.Error("bad value")
+	}
+	if n23.value != "c" {
+		t.Error("bad value")
+	}
+	n12.value = "b2"
+	n22.value = "b3"
+	if !tr1.Commit() {
+		t.Error("should commit")
+	}
+	if tr2.Commit() {
+		t.Error("should not commit")
+	}
+	tr3 := NewTransaction()
+	if tRead(t, tr3, h2).(*testNode).value != "b2" {
+		t.Error("bad value")
+	}
+}
+
 func fiddleTrans(t *testing.T, x string, h1, h2 *Handle, do, done chan bool) {
 	<- do
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10000; i++ {
 		tr := NewTransaction()
 		n1, err1 := tr.Write(h1)
 		n2, err2 := tr.Write(h2)
