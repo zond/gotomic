@@ -3,6 +3,8 @@ package gotomic
 
 import (
 	"testing"
+	"runtime"
+	"fmt"
 )
 
 type testNode struct {
@@ -59,6 +61,44 @@ func TestReadBreakage(t *testing.T) {
 	n, err := tr.Write(h)
 	if err == nil {
 		t.Errorf("%v should not allow reading of %v, but got %v", tr, h, n)
+	}
+}
+
+func fiddleTrans(t *testing.T, x string, h1, h2 *Handle, do, done chan bool) {
+	<- do
+	for i := 0; i < 100; i++ {
+		tr := NewTransaction()
+		n1, err1 := tr.Write(h1)
+		n2, err2 := tr.Write(h2)
+		if err1 == nil && err2 == nil {
+			if n1.(*testNode).value != n2.(*testNode).value {
+				t.Errorf("%v, %v: %v should == %v", x, i, n1, n2)
+			}
+			n1.(*testNode).value = x
+			n2.(*testNode).value = x
+			tr = NewTransaction()
+			n1, err1 = tr.Read(h1)
+			n2, err2 = tr.Read(h2)
+			if err1 == nil && err2 == nil && n1.(*testNode).value != n2.(*testNode).value {
+				t.Errorf("%v, %v: %v should == %v", x, i, n1, n2)
+			}
+		}
+	}
+	done <- true
+}
+
+func TestTransConcurrency(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	do := make(chan bool)
+	done := make(chan bool)
+	h1 := NewHandle(&testNode{"a", nil, nil})
+	h2 := NewHandle(&testNode{"a", nil, nil})
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go fiddleTrans(t, fmt.Sprint(i), h1, h2, do, done)
+	}
+	close(do)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		<- done
 	}
 }
 

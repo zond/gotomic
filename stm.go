@@ -15,7 +15,7 @@ const (
 	FAILED
 )
 
-var nextTransactionNumber uint64 = 0 
+var nextCommit uint64 = 0 
 
 type Clonable interface {
 	Clone() Clonable
@@ -52,7 +52,7 @@ type version struct {
 	/*
 	 The number of the transaction that created this version.
 	 */
-	transactionNumber uint64
+	commitNumber uint64
 	/*
 	 The transaction (or nil) having locked this version.
 	 */
@@ -62,9 +62,8 @@ type version struct {
 	 */
 	content Clonable
 }
-func (self *version) clone(transactionNumber uint64) *version {
+func (self *version) clone() *version {
 	newVersion := *self
-	newVersion.transactionNumber = transactionNumber
 	newVersion.content = self.content.Clone()
 	return &newVersion
 }
@@ -76,16 +75,16 @@ type snapshot struct {
 
 type Transaction struct {
 	/*
-	 Steadily incrementing number for each created transaction.
+	 Steadily incrementing number for each committed transaction.
 	 */
-	id uint64
+	commitNumber uint64
 	status int32
 	readHandles map[*Handle]*snapshot
 	writeHandles map[*Handle]*snapshot
 }
 func NewTransaction() *Transaction {
 	return &Transaction{
-		atomic.AddUint64(&nextTransactionNumber, 1), 
+		atomic.LoadUint64(&nextCommit),
 		UNDECIDED, 
 		make(map[*Handle]*snapshot), 
 		make(map[*Handle]*snapshot),
@@ -96,7 +95,7 @@ func (self *Transaction) getStatus() int32 {
 }
 func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	version := h.getVersion()
-	if version.transactionNumber > self.id {
+	if version.commitNumber > self.commitNumber {
 		return nil, fmt.Errorf("%v has changed", h.getVersion().content)
 	}
 	if version.lockedBy == nil {
@@ -104,16 +103,19 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	}
 	other := version.lockedBy
 	if other.getStatus() == READ_CHECK {
-		if self.getStatus() != READ_CHECK || self.id > other.id {
+		if self.getStatus() != READ_CHECK || self.commitNumber > other.commitNumber {
 			other.Commit()
 		} else {
 			other.Abort()
 		}
 	}
 	if other.getStatus() == SUCCESSFUL {
+		if other.commitNumber > self.commitNumber {
+			return nil, fmt.Errorf("%v has changed", other.writeHandles[h].neu.content)
+		}
 		return other.writeHandles[h].neu, nil
 	}
-	return other.writeHandles[h].old, nil
+	return version, nil
 }
 func (self *Transaction) sortedWrites() []*Handle {
 	var rval Handles
@@ -125,6 +127,9 @@ func (self *Transaction) sortedWrites() []*Handle {
 }
 func (self *Transaction) release() {
 	stat := self.getStatus()
+	if stat == SUCCESSFUL {
+		self.commitNumber = atomic.AddUint64(&nextCommit, 1)
+	}
 	for _, handle := range self.sortedWrites() {
 		current := handle.getVersion()
 		if current.lockedBy == self { 
@@ -132,6 +137,7 @@ func (self *Transaction) release() {
 			wanted := snapshot.old
 			if stat == SUCCESSFUL {
 				wanted = snapshot.neu
+				wanted.commitNumber = self.commitNumber
 			}
 			handle.replace(current, wanted)
 		}
@@ -141,7 +147,7 @@ func (self *Transaction) acquire() bool {
  	for _, handle := range self.sortedWrites() {
 		for {
 			snapshot, _ := self.writeHandles[handle]
-			lockedVersion := snapshot.old.clone(self.id)
+			lockedVersion := snapshot.old.clone()
 			lockedVersion.lockedBy = self
 			if handle.replace(snapshot.old, lockedVersion) {
 				break
@@ -176,14 +182,7 @@ func (self *Transaction) Commit() bool {
 		self.Abort()
 		return false
 	}
-	current := self.getStatus()
-	for {
-		if current == FAILED || current == SUCCESSFUL {
-			break
-		}
-		atomic.CompareAndSwapInt32(&self.status, current, SUCCESSFUL)
-		current = self.getStatus()
-	}
+	atomic.CompareAndSwapInt32(&self.status, READ_CHECK, SUCCESSFUL)
 	self.release()
 	return self.getStatus() == SUCCESSFUL;
 }
@@ -211,7 +210,7 @@ func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	if err != nil {
 		return nil, err
 	}
-	newVersion := oldVersion.clone(self.id)
+	newVersion := oldVersion.clone()
 	self.readHandles[h] = &snapshot{oldVersion, newVersion}
 	return newVersion.content, nil
 }
@@ -231,7 +230,7 @@ func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
 	if err != nil {
 		return nil, err
 	}
-	newVersion := oldVersion.clone(self.id)
+	newVersion := oldVersion.clone()
 	self.writeHandles[h] = &snapshot{oldVersion, newVersion}
 	return newVersion.content, nil
 }
