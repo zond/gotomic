@@ -1,8 +1,8 @@
 package gotomic
 
 /*
- * Ripped from http://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
- */
+ Ripped from http://graphics.stanford.edu/~seander/bithacks.html#ReverseParallel
+*/
 func reverse(v uint32) uint32 {
 	// swap odd and even bits
 	v = ((v >> 1) & 0x55555555) | ((v & 0x55555555) << 1)

@@ -1,8 +1,8 @@
 package gotomic
 
 /*
- * Ripped from http://graphics.stanford.edu/~seander/bithacks.html#IntegerLogLookup
- */
+ Ripped from http://graphics.stanford.edu/~seander/bithacks.html#IntegerLogLookup
+*/
 var LOG_TABLE_256 []uint32
 
 func init() {
