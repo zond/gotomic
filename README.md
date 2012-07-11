@@ -42,6 +42,8 @@ I find it likely that c) is more efficient than b) at higher levels of concurren
 
 See https://github.com/zond/gotomic/blob/master/examples/example.go or https://github.com/zond/gotomic/blob/master/examples/profile.go
 
+Also, see the tests.
+
 ## Documentation
 
 http://go.pkgdoc.org/github.com/zond/gotomic

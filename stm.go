@@ -226,6 +226,13 @@ func (self *Transaction) Abort() {
 	}
 	self.release()
 }
+/*
+ Read will return a version of the data in h that is guaranteed to not have been changed since this Transaction started.
+
+ Any changes made to the return value will *not* be saved when the Transaction commits.
+ 
+ If another Transaction changes the data in h before this Transaction commits the commit will fail.
+ */
 func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	if self.getStatus() != UNDECIDED {
 		return nil, fmt.Errorf("%v is not UNDECIDED", self)
@@ -244,6 +251,13 @@ func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	self.readHandles[h] = &snapshot{oldVersion, newVersion}
 	return newVersion.content, nil
 }
+/*
+ Write will return a version of the data in h that is guaranteed to not have been changed since this Transaction started.
+
+ All changes made to the return value *will* be saved when the Transaction commits.
+
+ If another Transaction changes the data in h before this Transaction commits the commit will fail.
+ */
 func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
 	if self.getStatus() != UNDECIDED {
 		return nil, fmt.Errorf("%v is not UNDECIDED", self)
