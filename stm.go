@@ -82,6 +82,19 @@ type snapshot struct {
 	neu *version
 }
 
+/*
+ Transaction is based on "Concurrent Programming Without Locks" by Keir Fraser and Tim Harris <http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf>
+ 
+ It has a few tweaks that I think, but can not prove, doesn't break it:
+
+ 1) It has an ever increasing counter for the last transaction to commit. 
+
+ It uses this counter to fail fast when trying to read a value that another transaction has changed since it began. 
+ 
+ 2) It copies the data not only on write opening, but also on read opening.
+ 
+ These changes will make the transactions act more along the lines of "Sandboxing Transactional Memory" by Luke Dalessandro and Michael L. Scott <http://www.cs.rochester.edu/u/scott/papers/2012_TRANSACT_sandboxing.pdf> and will hopefully avoid the need to kill transactions exhibiting invalid behaviour due to inconsistent states.
+ */
 type Transaction struct {
 	/*
 	 Steadily incrementing number for each committed transaction.
@@ -181,6 +194,9 @@ func (self *Transaction) readCheck() bool {
 	}
 	return true
 }
+/*
+ Commit the transaction. Will return whether the commit was successful or not.
+ */
 func (self *Transaction) Commit() bool {
 	if !self.acquire() {
 		self.Abort()
@@ -195,6 +211,11 @@ func (self *Transaction) Commit() bool {
 	self.release()
 	return self.getStatus() == SUCCESSFUL;
 }
+/*
+ Abort the transaction.
+ 
+ Unless the transaction is half-committed Abort isn't really necessary.
+ */
 func (self *Transaction) Abort() {
 	for {
 		current := self.getStatus()
