@@ -197,6 +197,9 @@ func (self *Transaction) Abort() {
 	self.release()
 }
 func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
+	if self.getStatus() != UNDECIDED {
+		return nil, fmt.Errorf("%v is not UNDECIDED", self)
+	}
 	if snapshot, ok := self.readHandles[h]; ok {
 		return snapshot.neu.content, nil
 	}
@@ -212,6 +215,9 @@ func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	return newVersion.content, nil
 }
 func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
+	if self.getStatus() != UNDECIDED {
+		return nil, fmt.Errorf("%v is not UNDECIDED", self)
+	}
 	if snapshot, ok := self.writeHandles[h]; ok {
 		return snapshot.neu.content, nil
 	}
