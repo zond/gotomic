@@ -45,6 +45,23 @@ func TestIsolation(t *testing.T) {
 	}
 }
 
+func TestReadBreakage(t *testing.T) {
+	h := NewHandle(&testNode{"a", nil, nil})
+	tr := NewTransaction()
+	tr2 := NewTransaction()
+	n2 := tWrite(t, tr2, h).(*testNode)
+	if n2.value != "a" {
+		t.Errorf("%v should be 'a'", n2.value)
+	}
+	if !tr2.Commit() {
+		t.Errorf("%v should commit!")
+	}
+	n, err := tr.Write(h)
+	if err == nil {
+		t.Errorf("%v should not allow reading of %v, but got %v", tr, h, n)
+	}
+}
+
 func TestCommit(t *testing.T) {
 	h := NewHandle(&testNode{"a", nil, nil})
 	tr := NewTransaction()

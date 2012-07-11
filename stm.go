@@ -62,8 +62,9 @@ type version struct {
 	 */
 	content Clonable
 }
-func (self *version) clone() *version {
+func (self *version) clone(transactionNumber uint64) *version {
 	newVersion := *self
+	newVersion.transactionNumber = transactionNumber
 	newVersion.content = self.content.Clone()
 	return &newVersion
 }
@@ -140,7 +141,7 @@ func (self *Transaction) acquire() bool {
  	for _, handle := range self.sortedWrites() {
 		for {
 			snapshot, _ := self.writeHandles[handle]
-			lockedVersion := snapshot.old.clone()
+			lockedVersion := snapshot.old.clone(self.id)
 			lockedVersion.lockedBy = self
 			if handle.replace(snapshot.old, lockedVersion) {
 				break
@@ -210,7 +211,7 @@ func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	if err != nil {
 		return nil, err
 	}
-	newVersion := oldVersion.clone()
+	newVersion := oldVersion.clone(self.id)
 	self.readHandles[h] = &snapshot{oldVersion, newVersion}
 	return newVersion.content, nil
 }
@@ -230,7 +231,7 @@ func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
 	if err != nil {
 		return nil, err
 	}
-	newVersion := oldVersion.clone()
+	newVersion := oldVersion.clone(self.id)
 	self.writeHandles[h] = &snapshot{oldVersion, newVersion}
 	return newVersion.content, nil
 }
