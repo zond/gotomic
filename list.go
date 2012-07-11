@@ -117,13 +117,13 @@ type element struct {
 func (self *element) next() *element {
 	next := atomic.LoadPointer(&self.Pointer)
 	for next != nil {
-		nextElement := (*element)(next);
+		nextElement := (*element)(next)
 		/*
 		 If our next element contains &deletedElement that means WE are deleted, and 
 		 we can just return the next-next element. It will make it impossible to add
 		 stuff to us, since we will always lie about our next(), but then again, deleted
 		 elements shouldn't get new children anyway.
-		 */
+		*/
 		if sp, ok := nextElement.value.(*string); ok && sp == &deletedElement {
 			return nextElement.next()
 		}
@@ -131,20 +131,20 @@ func (self *element) next() *element {
 		 If our next element is itself deleted (by the same criteria) then we will just replace
 		 it with its next() (which should be the first thing behind it that isn't itself deleted
 		 (the power of recursion compels you) and then check again.
-		 */
+		*/
 		if nextElement.isDeleted() {
 			atomic.CompareAndSwapPointer(&self.Pointer, next, unsafe.Pointer(nextElement.next()))
 			next = atomic.LoadPointer(&self.Pointer)
 		} else {
 			/*
 			 If it isn't deleted then we just return it.
-			 */
+			*/
 			return nextElement
 		}
 	}
 	/*
 	 And if our next is nil, then we are at the end of the list and can just return nil for next()
-	 */
+	*/
 	return nil
 }
 func (self *element) each(i ListIterator) {
@@ -188,13 +188,13 @@ func (self *element) add(c Thing) (rval bool) {
 	for {
 		/*
 		 If we are deleted then we do not allow adding new children.
-		 */
+		*/
 		if self.isDeleted() {
 			break
 		}
 		/*
 		 If we succeed in adding before our perceived next, just return true.
-		 */
+		*/
 		if self.addBefore(c, alloc, self.next()) {
 			rval = true
 			break
@@ -318,6 +318,7 @@ func (self *element) verify() (err error) {
 	return fmt.Errorf("%v is badly ordered. The following elements are in the wrong order: %v", self, string(buffer.Bytes()))
 
 }
+
 /*
  Just a shorthand to hide the inner workings of our removal mechanism.
 */
@@ -329,13 +330,13 @@ func (self *element) remove() (rval Thing, ok bool) {
 	for {
 		/*
 		 No children to remove.
-		 */
+		*/
 		if n == nil {
 			break
 		}
 		/*
 		 We managed to remove next!
-		 */
+		*/
 		if n.doRemove() {
 			self.next()
 			rval = n.value

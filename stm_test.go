@@ -1,17 +1,17 @@
-
 package gotomic
 
 import (
-	"testing"
-	"runtime"
 	"fmt"
+	"runtime"
+	"testing"
 )
 
 type testNode struct {
 	value string
-	left *testNode
+	left  *testNode
 	right *testNode
 }
+
 func (self *testNode) Clone() Clonable {
 	rval := *self
 	return &rval
@@ -178,7 +178,7 @@ func TestDiffTrans3(t *testing.T) {
 }
 
 func fiddleTrans(t *testing.T, x string, h1, h2 *Handle, do, done chan bool) {
-	<- do
+	<-do
 	for i := 0; i < 10000; i++ {
 		tr := NewTransaction()
 		n1, err1 := tr.Write(h1)
@@ -211,7 +211,7 @@ func TestTransConcurrency(t *testing.T) {
 	}
 	close(do)
 	for i := 0; i < runtime.NumCPU(); i++ {
-		<- done
+		<-done
 	}
 }
 

@@ -1,11 +1,10 @@
-
 package gotomic
 
 import (
-	"sync/atomic"
 	"fmt"
-	"unsafe"
 	"sort"
+	"sync/atomic"
+	"unsafe"
 )
 
 const (
@@ -15,30 +14,31 @@ const (
 	FAILED
 )
 
-var nextCommit uint64 = 0 
+var nextCommit uint64 = 0
 
 /*
  Clonable types can be handled by the transaction layer.
- */
+*/
 type Clonable interface {
 	Clone() Clonable
 }
 
 /*
  Handle wraps any type of data that is supposed to be handled by the transaction layer.
- */
+*/
 type Handle struct {
 	/*
 	 Will point to a version.
-	 */
+	*/
 	unsafe.Pointer
 }
+
 /*
  NewHandle will wrap a Clonable value to enable its use in the transaction layer.
- */
+*/
 func NewHandle(c Clonable) *Handle {
 	return &Handle{unsafe.Pointer(&version{0, nil, c})}
-} 
+}
 func (self *Handle) getVersion() *version {
 	return (*version)(atomic.LoadPointer(&self.Pointer))
 }
@@ -47,6 +47,7 @@ func (self *Handle) replace(old, neu *version) bool {
 }
 
 type handles []*Handle
+
 func (self handles) Len() int {
 	return len(self)
 }
@@ -60,17 +61,18 @@ func (self handles) Less(i, j int) bool {
 type version struct {
 	/*
 	 The number of the transaction that created this version.
-	 */
+	*/
 	commitNumber uint64
 	/*
 	 The transaction (or nil) having locked this version.
-	 */
+	*/
 	lockedBy *Transaction
 	/*
-	The content in this version.
-	 */
+		The content in this version.
+	*/
 	content Clonable
 }
+
 func (self *version) clone() *version {
 	newVersion := *self
 	newVersion.content = self.content.Clone()
@@ -84,31 +86,32 @@ type snapshot struct {
 
 /*
  Transaction is based on "Concurrent Programming Without Locks" by Keir Fraser and Tim Harris <http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf>
- 
+
  It has a few tweaks that I think, but can not prove, doesn't break it:
 
  1) It has an ever increasing counter for the last transaction to commit. 
 
  It uses this counter to fail fast when trying to read a value that another transaction has changed since it began. 
- 
+
  2) It copies the data not only on write opening, but also on read opening.
- 
+
  These changes will make the transactions act more along the lines of "Sandboxing Transactional Memory" by Luke Dalessandro and Michael L. Scott <http://www.cs.rochester.edu/u/scott/papers/2012_TRANSACT_sandboxing.pdf> and will hopefully avoid the need to kill transactions exhibiting invalid behaviour due to inconsistent states.
- */
+*/
 type Transaction struct {
 	/*
 	 Steadily incrementing number for each committed transaction.
-	 */
+	*/
 	commitNumber uint64
-	status int32
-	readHandles map[*Handle]*snapshot
+	status       int32
+	readHandles  map[*Handle]*snapshot
 	writeHandles map[*Handle]*snapshot
 }
+
 func NewTransaction() *Transaction {
 	return &Transaction{
 		atomic.LoadUint64(&nextCommit),
-		UNDECIDED, 
-		make(map[*Handle]*snapshot), 
+		UNDECIDED,
+		make(map[*Handle]*snapshot),
 		make(map[*Handle]*snapshot),
 	}
 }
@@ -154,7 +157,7 @@ func (self *Transaction) release() {
 	}
 	for _, handle := range self.sortedWrites() {
 		current := handle.getVersion()
-		if current.lockedBy == self { 
+		if current.lockedBy == self {
 			snapshot := self.writeHandles[handle]
 			wanted := snapshot.old
 			if stat == SUCCESSFUL {
@@ -166,7 +169,7 @@ func (self *Transaction) release() {
 	}
 }
 func (self *Transaction) acquire() bool {
- 	for _, handle := range self.sortedWrites() {
+	for _, handle := range self.sortedWrites() {
 		for {
 			snapshot, _ := self.writeHandles[handle]
 			lockedVersion := snapshot.old.clone()
@@ -194,14 +197,15 @@ func (self *Transaction) readCheck() bool {
 	}
 	return true
 }
+
 /*
  Commit the transaction. Will return whether the commit was successful or not.
- */
+*/
 func (self *Transaction) Commit() bool {
 	if !self.acquire() {
 		self.Abort()
 		return false
-	} 
+	}
 	atomic.CompareAndSwapInt32(&self.status, UNDECIDED, READ_CHECK)
 	if !self.readCheck() {
 		self.Abort()
@@ -209,13 +213,14 @@ func (self *Transaction) Commit() bool {
 	}
 	atomic.CompareAndSwapInt32(&self.status, READ_CHECK, SUCCESSFUL)
 	self.release()
-	return self.getStatus() == SUCCESSFUL;
+	return self.getStatus() == SUCCESSFUL
 }
+
 /*
  Abort the transaction.
- 
+
  Unless the transaction is half-committed Abort isn't really necessary.
- */
+*/
 func (self *Transaction) Abort() {
 	for {
 		current := self.getStatus()
@@ -226,14 +231,15 @@ func (self *Transaction) Abort() {
 	}
 	self.release()
 }
+
 /*
  Read will return a version of the data in h that is guaranteed to not have been changed since this Transaction started.
 
  Any changes made to the return value will *not* be saved when the Transaction commits.
- 
+
  If another Transaction changes the data in h before this Transaction commits the commit will fail.
- */
-func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
+*/
+func (self *Transaction) Read(h *Handle) (rval Clonable, err error) {
 	if self.getStatus() != UNDECIDED {
 		return nil, fmt.Errorf("%v is not UNDECIDED", self)
 	}
@@ -251,13 +257,14 @@ func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	self.readHandles[h] = &snapshot{oldVersion, newVersion}
 	return newVersion.content, nil
 }
+
 /*
  Write will return a version of the data in h that is guaranteed to not have been changed since this Transaction started.
 
  All changes made to the return value *will* be saved when the Transaction commits.
 
  If another Transaction changes the data in h before this Transaction commits the commit will fail.
- */
+*/
 func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
 	if self.getStatus() != UNDECIDED {
 		return nil, fmt.Errorf("%v is not UNDECIDED", self)
