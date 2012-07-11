@@ -3,6 +3,7 @@ package gotomic
 
 import (
 	"sync/atomic"
+	"fmt"
 	"unsafe"
 	"sort"
 )
@@ -31,6 +32,9 @@ func NewHandle(c Clonable) *Handle {
 } 
 func (self *Handle) getVersion() *version {
 	return (*version)(atomic.LoadPointer(&self.Pointer))
+}
+func (self *Handle) replace(old, neu *version) bool {
+	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old), unsafe.Pointer(neu))
 }
 
 type Handles []*Handle
@@ -89,10 +93,13 @@ func NewTransaction() *Transaction {
 func (self *Transaction) getStatus() int32 {
 	return atomic.LoadInt32(&self.status)
 }
-func (self *Transaction) objRead(h *Handle) *version {
+func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	version := h.getVersion()
+	if version.transactionNumber > self.id {
+		return nil, fmt.Errorf("%v has changed", h.getVersion().content)
+	}
 	if version.lockedBy == nil {
-		return version
+		return version, nil
 	}
 	other := version.lockedBy
 	if other.getStatus() == READ_CHECK {
@@ -103,9 +110,9 @@ func (self *Transaction) objRead(h *Handle) *version {
 		}
 	}
 	if other.getStatus() == SUCCESSFUL {
-		return other.writeHandles[h].neu
+		return other.writeHandles[h].neu, nil
 	}
-	return other.writeHandles[h].old
+	return other.writeHandles[h].old, nil
 }
 func (self *Transaction) sortedWrites() []*Handle {
 	var rval Handles
@@ -125,13 +132,59 @@ func (self *Transaction) release() {
 			if stat == SUCCESSFUL {
 				wanted = snapshot.neu
 			}
-			atomic.CompareAndSwapPointer(&handle.Pointer, unsafe.Pointer(current), unsafe.Pointer(wanted))
+			handle.replace(current, wanted)
 		}
 	}
 }
+func (self *Transaction) acquire() bool {
+ 	for _, handle := range self.sortedWrites() {
+		for {
+			snapshot, _ := self.writeHandles[handle]
+			lockedVersion := snapshot.old.clone()
+			lockedVersion.lockedBy = self
+			if handle.replace(snapshot.old, lockedVersion) {
+				break
+			}
+			current := handle.getVersion()
+			if current.lockedBy == nil {
+				return false
+			}
+			if current.lockedBy == self {
+				break
+			}
+			current.lockedBy.Commit()
+		}
+	}
+	return true
+}
+func (self *Transaction) readCheck() bool {
+	for handle, snapshot := range self.readHandles {
+		if handle.getVersion() != snapshot.old {
+			return false
+		}
+	}
+	return true
+}
 func (self *Transaction) Commit() bool {
-	self.Abort()
-	return false
+	if !self.acquire() {
+		self.Abort()
+		return false
+	} 
+	atomic.CompareAndSwapInt32(&self.status, UNDECIDED, READ_CHECK)
+	if !self.readCheck() {
+		self.Abort()
+		return false
+	}
+	current := self.getStatus()
+	for {
+		if current == FAILED || current == SUCCESSFUL {
+			break
+		}
+		atomic.CompareAndSwapInt32(&self.status, current, SUCCESSFUL)
+		current = self.getStatus()
+	}
+	self.release()
+	return self.getStatus() == SUCCESSFUL;
 }
 func (self *Transaction) Abort() {
 	for {
@@ -143,29 +196,35 @@ func (self *Transaction) Abort() {
 	}
 	self.release()
 }
-func (self *Transaction) Read(h *Handle) Clonable {
+func (self *Transaction) Read(h *Handle) (rval Clonable, err error)  {
 	if snapshot, ok := self.readHandles[h]; ok {
-		return snapshot.neu.content
+		return snapshot.neu.content, nil
 	}
 	if snapshot, ok := self.writeHandles[h]; ok {
-		return snapshot.neu.content
+		return snapshot.neu.content, nil
 	}
-	oldVersion := self.objRead(h)
+	oldVersion, err := self.objRead(h)
+	if err != nil {
+		return nil, err
+	}
 	newVersion := oldVersion.clone()
 	self.readHandles[h] = &snapshot{oldVersion, newVersion}
-	return newVersion.content
+	return newVersion.content, nil
 }
-func (self *Transaction) Write(h *Handle) Clonable {
+func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
 	if snapshot, ok := self.writeHandles[h]; ok {
-		return snapshot.neu.content
+		return snapshot.neu.content, nil
 	}
 	if snapshot, ok := self.readHandles[h]; ok {
 		delete(self.readHandles, h)
 		self.writeHandles[h] = snapshot
-		return snapshot.neu.content
+		return snapshot.neu.content, nil
 	}
-	oldVersion := (*version)(atomic.LoadPointer(&h.Pointer))
+	oldVersion, err := self.objRead(h)
+	if err != nil {
+		return nil, err
+	}
 	newVersion := oldVersion.clone()
 	self.writeHandles[h] = &snapshot{oldVersion, newVersion}
-	return newVersion.content
+	return newVersion.content, nil
 }
