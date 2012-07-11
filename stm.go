@@ -17,16 +17,25 @@ const (
 
 var nextCommit uint64 = 0 
 
+/*
+ Clonable types can be handled by the transaction layer.
+ */
 type Clonable interface {
 	Clone() Clonable
 }
 
+/*
+ Handle wraps any type of data that is supposed to be handled by the transaction layer.
+ */
 type Handle struct {
 	/*
 	 Will point to a version.
 	 */
 	unsafe.Pointer
 }
+/*
+ NewHandle will wrap a Clonable value to enable its use in the transaction layer.
+ */
 func NewHandle(c Clonable) *Handle {
 	return &Handle{unsafe.Pointer(&version{0, nil, c})}
 } 
@@ -37,14 +46,14 @@ func (self *Handle) replace(old, neu *version) bool {
 	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old), unsafe.Pointer(neu))
 }
 
-type Handles []*Handle
-func (self Handles) Len() int {
+type handles []*Handle
+func (self handles) Len() int {
 	return len(self)
 }
-func (self Handles) Swap(i, j int) {
+func (self handles) Swap(i, j int) {
 	self[i], self[j] = self[j], self[i]
 }
-func (self Handles) Less(i, j int) bool {
+func (self handles) Less(i, j int) bool {
 	return uintptr(unsafe.Pointer(self[i])) < uintptr(unsafe.Pointer(self[j]))
 }
 
@@ -118,7 +127,7 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	return version, nil
 }
 func (self *Transaction) sortedWrites() []*Handle {
-	var rval Handles
+	var rval handles
 	for handle, _ := range self.writeHandles {
 		rval = append(rval, handle)
 	}

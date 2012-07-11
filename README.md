@@ -8,6 +8,8 @@ The `List` type is implemented using [A Pragmatic Implementation of Non-Blocking
 
 The `Hash` type is implemented using [Split-Ordered Lists: Lock-Free Extensible Hash Tables by Ori Shalev and Nir Shavit](http://www.cs.ucf.edu/~dcm/Teaching/COT4810-Spring2011/Literature/SplitOrderedLists.pdf) with the List type used as backend.
 
+The `Transaction` type is implemented using OSTM from [Concurrent Programming Without Locks by Keir Fraser and Tim Harris](http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf) with a few tweaks described in https://github.com/zond/gotomic/blob/master/stm.go.
+
 ## Performance
 
 On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
