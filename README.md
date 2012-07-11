@@ -29,8 +29,8 @@ b)
 
 c)
 
-    BenchmarkHash	  500000	      4410 ns/op
-    BenchmarkHashConc	  500000	      8143 ns/op
+    BenchmarkHash      500000	      5146 ns/op
+    BenchmarkHashConc	  500000	     10599 ns/op
 
 Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive RWMutex wrapped native map b) is much faster at single thread operation, and about as efficient in multi thread operation, compared to c).
 
