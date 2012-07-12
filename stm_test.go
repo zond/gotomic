@@ -29,93 +29,115 @@ func compStrings(i, j string) int {
 
 type testNode struct {
 	value string
-	left  *Handle
-	right *Handle
+	left  *testNodeHandle
+	right *testNodeHandle
 }
 
-func (self *testNode) insert(t *Transaction, v string) error {
+func (self *testNode) Clone() Clonable {
+	rval := *self
+	return &rval
+}
+
+type testNodeHandle Handle
+
+func newTestNodeHandle(v string) *testNodeHandle {
+	return (*testNodeHandle)(NewHandle(&testNode{v, nil, nil}))
+}
+func (handle *testNodeHandle) getNode(t *Transaction) *testNode {
+	node, err := handle.readNode(t)
+	if err != nil {
+		panic(err)
+	}
+	return node
+}
+func (handle *testNodeHandle) readNode(t *Transaction) (*testNode, error) {
+	node, err := t.Read((*Handle)(handle))
+	if err != nil {
+		return nil, err
+	}
+	return node.(*testNode), nil
+}
+func (handle *testNodeHandle) writeNode(t *Transaction) (*testNode, error) {
+	node, err := t.Write((*Handle)(handle))
+	if err != nil {
+		return nil, err
+	}
+	return node.(*testNode), nil
+}
+func (handle *testNodeHandle) insert(t *Transaction, v string) error {
+	self, err := handle.writeNode(t)
+	if err != nil {
+		return err
+	}
 	cmp := compStrings(self.value, v)
 	if cmp > 0 {
 		if self.left == nil {
-			self.left = NewHandle(&testNode{v, nil, nil})
+			self.left = newTestNodeHandle(v)
 		} else {
-			ln, err := t.Write(self.left)
-			if err != nil {
-				return err
-			}
-			if err = ln.(*testNode).insert(t, v); err != nil {
+			if err := self.left.insert(t, v); err != nil {
 				return err
 			}
 		}
 	} else if cmp < 0 {
 		if self.right == nil {
-			self.right = NewHandle(&testNode{v, nil, nil})
+			self.right = newTestNodeHandle(v)
 		} else {
-			rn, err := t.Write(self.right)
-			if err != nil {
-				return err
-			}
-			if err = rn.(*testNode).insert(t, v); err != nil {
+			if err := self.right.insert(t, v); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
 }
-func (self *testNode) Clone() Clonable {
-	rval := *self
-	return &rval
-}
-func (self *testNode) indentString(t *Transaction, i int) string {
+func (handle *testNodeHandle) indentString(t *Transaction, i int) string {
+	self, err := handle.readNode(t)
+	if err != nil {
+		return err.Error()
+	}
 	buf := new(bytes.Buffer)
 	for j := 0; j < i; j++ {
 		fmt.Fprint(buf, " ")
 	}
 	fmt.Fprintf(buf, "%#v", self)
 	if self.left != nil {
-		if ln, _ := t.Read(self.left); ln != nil {
-			fmt.Fprintf(buf, "\nl:%v", ln.(*testNode).indentString(t, i+1))
-		}
+		fmt.Fprintf(buf, "\nl:%v", self.left.indentString(t, i+1))
 	}
 	if self.right != nil {
-		if rn, _ := t.Read(self.right); rn != nil {
-			fmt.Fprintf(buf, "\nr:%v", rn.(*testNode).indentString(t, i+1))
-		}
+		fmt.Fprintf(buf, "\nr:%v", self.right.indentString(t, i+1))
 	}
 	return string(buf.Bytes())
 }
-func (self *testNode) String() string {
+func (self *testNodeHandle) String() string {
 	return self.indentString(NewTransaction(), 0)
 }
 
 func TestSTMBasicTestTree(t *testing.T) {
-	hc := NewHandle(&testNode{"c", nil, nil})
+	hc := newTestNodeHandle("c")
 	tr := NewTransaction()
-	nc := tWrite(t, tr, hc).(*testNode)
-	if err := nc.insert(tr, "a"); err != nil {
-		t.Errorf("%v should insert 'a' but got %v", nc, err)
+	if err := hc.insert(tr, "a"); err != nil {
+		t.Errorf("%v should insert 'a' but got %v", hc, err)
 	}
-	if err := nc.insert(tr, "d"); err != nil {
-		t.Errorf("%v should insert 'd' but got %v", nc, err)
+	if err := hc.insert(tr, "d"); err != nil {
+		t.Errorf("%v should insert 'd' but got %v", hc, err)
 	}
-	if err := nc.insert(tr, "b"); err != nil {
-		t.Errorf("%v should insert 'b' but got %v", nc, err)
+	if err := hc.insert(tr, "b"); err != nil {
+		t.Errorf("%v should insert 'b' but got %v", hc, err)
 	}
 	tr.Commit()
 	tr = NewTransaction()
-	nc = tRead(t, tr, hc).(*testNode)
+	nc := hc.getNode(tr)
 	if nc.value != "c" {
 		t.Error("bad value")
 	}
-	nd := tRead(t, tr, nc.right).(*testNode)
+	nd := nc.right.getNode(tr)
 	if nd.value != "d" {
 		t.Error("bad value")
 	}
-	na := tRead(t, tr, nc.left).(*testNode)
+	na := nc.left.getNode(tr)
 	if na.value != "a" {
 		t.Error("bad value")
 	}
-	nb := tRead(t, tr, na.right).(*testNode)
+	nb := na.right.getNode(tr)
 	if nb.value != "b" {
 		t.Error("bad value")
 	}
