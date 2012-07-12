@@ -76,6 +76,7 @@ type version struct {
 func (self *version) clone() *version {
 	newVersion := *self
 	newVersion.content = self.content.Clone()
+	newVersion.lockedBy = nil
 	return &newVersion
 }
 
@@ -156,21 +157,26 @@ func (self *Transaction) release() {
 	if stat == successful {
 		self.commitNumber = atomic.AddUint64(&nextCommit, 1)
 	}
-	for _, handle := range self.sortedWrites() {
+	sw := self.sortedWrites()
+	for _, handle := range sw {
 		current := handle.getVersion()
-		if current.lockedBy == self {
+		for current.lockedBy == self {
 			snapshot := self.writeHandles[handle]
 			wanted := snapshot.old
 			if stat == successful {
 				wanted = snapshot.neu
 				wanted.commitNumber = self.commitNumber
 			}
-			handle.replace(current, wanted)
+			if handle.replace(current, wanted) {
+				break
+			}
+			current = handle.getVersion()
 		}
 	}
 }
 func (self *Transaction) acquire() bool {
-	for _, handle := range self.sortedWrites() {
+	sw := self.sortedWrites()
+	for _, handle := range sw {
 		for {
 			snapshot, _ := self.writeHandles[handle]
 			lockedVersion := snapshot.old.clone()
@@ -207,13 +213,13 @@ func (self *Transaction) Commit() bool {
 		self.Abort()
 		return false
 	}
+	defer self.release()
 	atomic.CompareAndSwapInt32(&self.status, undecided, read_check)
 	if !self.readCheck() {
 		self.Abort()
 		return false
 	}
-	atomic.CompareAndSwapInt32(&self.status, read_check, successful)
-	self.release()
+	atomic.StoreInt32(&self.status, successful)
 	return self.getStatus() == successful
 }
 
@@ -223,13 +229,7 @@ func (self *Transaction) Commit() bool {
  Unless the transaction is half-committed Abort isn't really necessary.
 */
 func (self *Transaction) Abort() {
-	for {
-		current := self.getStatus()
-		if current == failed {
-			break
-		}
-		atomic.CompareAndSwapInt32(&self.status, current, failed)
-	}
+	atomic.StoreInt32(&self.status, failed)
 	self.release()
 }
 
