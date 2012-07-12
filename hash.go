@@ -8,8 +8,8 @@ import (
 	"unsafe"
 )
 
-const MAX_EXPONENT = 32
-const DEFAULT_LOAD_FACTOR = 0.5
+const max_exponent = 32
+const default_load_factor = 0.5
 
 type HashIterator func(k Hashable, v Thing)
 
@@ -143,7 +143,7 @@ type Hash struct {
 }
 
 func NewHash() *Hash {
-	rval := &Hash{0, make([]unsafe.Pointer, MAX_EXPONENT), 0, DEFAULT_LOAD_FACTOR}
+	rval := &Hash{0, make([]unsafe.Pointer, max_exponent), 0, default_load_factor}
 	b := make([]unsafe.Pointer, 1)
 	rval.buckets[0] = unsafe.Pointer(&b)
 	return rval
@@ -380,7 +380,7 @@ func (self *Hash) grow() {
 }
 func (self *Hash) getPreviousBucketIndex(bucketKey uint32) uint32 {
 	exp := atomic.LoadUint32(&self.exponent)
-	return reverse(((bucketKey >> (MAX_EXPONENT - exp)) - 1) << (MAX_EXPONENT - exp))
+	return reverse(((bucketKey >> (max_exponent - exp)) - 1) << (max_exponent - exp))
 }
 func (self *Hash) getBucketByHashCode(hashCode uint32) *element {
 	return self.getBucketByIndex(hashCode & ((1 << self.exponent) - 1))

@@ -8,10 +8,10 @@ import (
 )
 
 const (
-	UNDECIDED = iota
-	READ_CHECK
-	SUCCESSFUL
-	FAILED
+	undecided = iota
+	read_check
+	successful
+	failed
 )
 
 var nextCommit uint64 = 0
@@ -111,7 +111,7 @@ type Transaction struct {
 func NewTransaction() *Transaction {
 	return &Transaction{
 		atomic.LoadUint64(&nextCommit),
-		UNDECIDED,
+		undecided,
 		make(map[*Handle]*snapshot),
 		make(map[*Handle]*snapshot),
 	}
@@ -128,14 +128,14 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 		return version, nil
 	}
 	other := version.lockedBy
-	if other.getStatus() == READ_CHECK {
-		if self.getStatus() != READ_CHECK || self.commitNumber > other.commitNumber {
+	if other.getStatus() == read_check {
+		if self.getStatus() != read_check || self.commitNumber > other.commitNumber {
 			other.Commit()
 		} else {
 			other.Abort()
 		}
 	}
-	if other.getStatus() == SUCCESSFUL {
+	if other.getStatus() == successful {
 		if other.commitNumber > self.commitNumber {
 			return nil, fmt.Errorf("%v has changed", other.writeHandles[h].neu.content)
 		}
@@ -153,7 +153,7 @@ func (self *Transaction) sortedWrites() []*Handle {
 }
 func (self *Transaction) release() {
 	stat := self.getStatus()
-	if stat == SUCCESSFUL {
+	if stat == successful {
 		self.commitNumber = atomic.AddUint64(&nextCommit, 1)
 	}
 	for _, handle := range self.sortedWrites() {
@@ -161,7 +161,7 @@ func (self *Transaction) release() {
 		if current.lockedBy == self {
 			snapshot := self.writeHandles[handle]
 			wanted := snapshot.old
-			if stat == SUCCESSFUL {
+			if stat == successful {
 				wanted = snapshot.neu
 				wanted.commitNumber = self.commitNumber
 			}
@@ -207,14 +207,14 @@ func (self *Transaction) Commit() bool {
 		self.Abort()
 		return false
 	}
-	atomic.CompareAndSwapInt32(&self.status, UNDECIDED, READ_CHECK)
+	atomic.CompareAndSwapInt32(&self.status, undecided, read_check)
 	if !self.readCheck() {
 		self.Abort()
 		return false
 	}
-	atomic.CompareAndSwapInt32(&self.status, READ_CHECK, SUCCESSFUL)
+	atomic.CompareAndSwapInt32(&self.status, read_check, successful)
 	self.release()
-	return self.getStatus() == SUCCESSFUL
+	return self.getStatus() == successful
 }
 
 /*
@@ -225,10 +225,10 @@ func (self *Transaction) Commit() bool {
 func (self *Transaction) Abort() {
 	for {
 		current := self.getStatus()
-		if current == FAILED {
+		if current == failed {
 			return
 		}
-		atomic.CompareAndSwapInt32(&self.status, current, FAILED)
+		atomic.CompareAndSwapInt32(&self.status, current, failed)
 	}
 	self.release()
 }
@@ -241,8 +241,8 @@ func (self *Transaction) Abort() {
  If another Transaction changes the data in h before this Transaction commits the commit will fail.
 */
 func (self *Transaction) Read(h *Handle) (rval Clonable, err error) {
-	if self.getStatus() != UNDECIDED {
-		return nil, fmt.Errorf("%v is not UNDECIDED", self)
+	if self.getStatus() != undecided {
+		return nil, fmt.Errorf("%v is not undecided", self)
 	}
 	if snapshot, ok := self.readHandles[h]; ok {
 		return snapshot.neu.content, nil
@@ -267,8 +267,8 @@ func (self *Transaction) Read(h *Handle) (rval Clonable, err error) {
  If another Transaction changes the data in h before this Transaction commits the commit will fail.
 */
 func (self *Transaction) Write(h *Handle) (rval Clonable, err error) {
-	if self.getStatus() != UNDECIDED {
-		return nil, fmt.Errorf("%v is not UNDECIDED", self)
+	if self.getStatus() != undecided {
+		return nil, fmt.Errorf("%v is not undecided", self)
 	}
 	if snapshot, ok := self.writeHandles[h]; ok {
 		return snapshot.neu.content, nil
