@@ -87,7 +87,7 @@ type snapshot struct {
 /*
  Transaction is based on "Concurrent Programming Without Locks" by Keir Fraser and Tim Harris <http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf>
 
- It has a few tweaks that I think, but can not prove, doesn't break it:
+ It has a few tweaks that I don't believe break it (but I haven't even tried proving it):
 
  1) It has an ever increasing counter for the last transaction to commit. 
 
