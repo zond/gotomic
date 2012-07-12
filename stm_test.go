@@ -189,7 +189,6 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 			}
 		}
 	}
-/*
 	for i := 0; i < 10; i++ {
 		for {
 			tr := NewTransaction()
@@ -203,7 +202,6 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 			}
 		}
 	}
-*/
 	done <- true
 }
 
