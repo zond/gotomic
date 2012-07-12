@@ -3,6 +3,7 @@ package gotomic
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"runtime"
 	"testing"
 )
@@ -64,6 +65,45 @@ func (handle *testNodeHandle) writeNode(t *Transaction) (*testNode, error) {
 	}
 	return node.(*testNode), nil
 }
+func (handle *testNodeHandle) remove(t *Transaction, v string) (newHandle *testNodeHandle, err error) {
+	self, err := handle.writeNode(t)
+	if err != nil {
+		return handle, err
+	}
+	cmp := compStrings(self.value, v)
+	if cmp > 0 {
+		if self.left != nil {
+			self.left, err = self.left.remove(t, v)
+			if err != nil {
+				return handle, err
+			}
+		}
+	} else if cmp < 0 {
+		if self.right != nil {
+			self.right, err = self.right.remove(t, v)
+			if err != nil {
+				return handle, err
+			}
+		}
+	} else {
+		if self.right == nil {
+			if self.left == nil {
+				return nil, nil
+			} else {
+				return self.left, nil
+			}
+		} else {
+			if self.left == nil {
+				return self.right, nil
+			} else {
+				if rand.Float32() > 0.5 {
+					return self.right, nil
+				}
+			}
+		}
+	}
+	return handle, nil
+}
 func (handle *testNodeHandle) insert(t *Transaction, v string) error {
 	self, err := handle.writeNode(t)
 	if err != nil {
@@ -111,36 +151,81 @@ func (self *testNodeHandle) String() string {
 	return self.indentString(NewTransaction(), 0)
 }
 
+type cmpNode struct {
+	value string
+	left  *cmpNode
+	right *cmpNode
+}
+
+func assertTreeStructure(t *testing.T, h *testNodeHandle, c *cmpNode) {
+	if c == nil {
+		if h != nil {
+			t.Error("should be nil, was %v", h)
+		}
+	} else {
+		tr := NewTransaction()
+		n, err := h.readNode(tr)
+		if err != nil {
+			t.Errorf("%v should be readable, got %v", h, err)
+		}
+		if c.value != n.value {
+			t.Errorf("%v should have value %v, had %v", h, c.value, n.value)
+		}
+		assertTreeStructure(t, n.left, c.left)
+		assertTreeStructure(t, n.right, c.right)
+	}
+}
+
 func TestSTMBasicTestTree(t *testing.T) {
 	hc := newTestNodeHandle("c")
+	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
 	tr := NewTransaction()
 	if err := hc.insert(tr, "a"); err != nil {
 		t.Errorf("%v should insert 'a' but got %v", hc, err)
 	}
+	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
 	if err := hc.insert(tr, "d"); err != nil {
 		t.Errorf("%v should insert 'd' but got %v", hc, err)
 	}
+	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
 	if err := hc.insert(tr, "b"); err != nil {
 		t.Errorf("%v should insert 'b' but got %v", hc, err)
 	}
-	tr.Commit()
+	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
+	if !tr.Commit() {
+		t.Errorf("%v should commit", tr)
+	}
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
 	tr = NewTransaction()
-	nc := hc.getNode(tr)
-	if nc.value != "c" {
-		t.Error("bad value")
+	hc, err := hc.remove(tr, "d")
+	if err != nil {
+		t.Errorf("%v should remove 'd' but got", err)
 	}
-	nd := nc.right.getNode(tr)
-	if nd.value != "d" {
-		t.Error("bad value")
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
+	if !tr.Commit() {
+		t.Errorf("%v should commit", tr)
 	}
-	na := nc.left.getNode(tr)
-	if na.value != "a" {
-		t.Error("bad value")
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, nil})
+	tr = NewTransaction()
+	err = hc.insert(tr, "e")
+	if err != nil {
+		t.Errorf("%v should insert 'e' but got %v", hc, err)
 	}
-	nb := na.right.getNode(tr)
-	if nb.value != "b" {
-		t.Error("bad value")
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, nil})
+	if !tr.Commit() {
+		t.Errorf("%v should commit", tr)
 	}
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"e", nil, nil}})
+	tr = NewTransaction()
+	hc, err = hc.remove(tr, "a")
+	if err != nil {
+		t.Errorf("%v should remove 'a' but got", err)
+	}
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"e", nil, nil}})
+	if !tr.Commit() {
+		t.Errorf("%v should commit", tr)
+	}
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"b", nil, nil}, &cmpNode{"e", nil, nil}})
 }
 
 func tWrite(t *testing.T, tr *Transaction, h *Handle) Thing {
