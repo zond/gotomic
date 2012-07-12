@@ -91,7 +91,8 @@ type snapshot struct {
 
  1) It has an ever increasing counter for the last transaction to commit. 
 
- It uses this counter to fail fast when trying to read a value that another transaction has changed since it began. 
+ It uses this counter to fail transactions fast when they try to read a value that another 
+ transaction has changed since the first transaction began. 
 
  2) It copies the data not only on write opening, but also on read opening.
 
