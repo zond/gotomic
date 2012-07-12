@@ -46,18 +46,6 @@ func (self *Handle) replace(old, neu *version) bool {
 	return atomic.CompareAndSwapPointer(&self.Pointer, unsafe.Pointer(old), unsafe.Pointer(neu))
 }
 
-type handles []*Handle
-
-func (self handles) Len() int {
-	return len(self)
-}
-func (self handles) Swap(i, j int) {
-	self[i], self[j] = self[j], self[i]
-}
-func (self handles) Less(i, j int) bool {
-	return uintptr(unsafe.Pointer(self[i])) < uintptr(unsafe.Pointer(self[j]))
-}
-
 type version struct {
 	/*
 	 The number of the transaction that created this version.
@@ -85,6 +73,23 @@ type snapshot struct {
 	neu *version
 }
 
+type write struct {
+	handle *Handle
+	snapshot *snapshot
+}
+type writes []write
+func (self writes) Len() int {
+	return len(self)
+}
+func (self writes) Swap(i, j int) {
+	self[i], self[j] = self[j], self[i]
+}
+func (self writes) Less(i, j int) bool {
+	return uintptr(unsafe.Pointer(self[i].handle)) < uintptr(unsafe.Pointer(self[j].handle))
+}
+
+
+
 /*
  Transaction is based on "Concurrent Programming Without Locks" by Keir Fraser and Tim Harris <http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf>
 
@@ -107,6 +112,7 @@ type Transaction struct {
 	status       int32
 	readHandles  map[*Handle]*snapshot
 	writeHandles map[*Handle]*snapshot
+	sortedWrites writes
 }
 
 func NewTransaction() *Transaction {
@@ -115,6 +121,7 @@ func NewTransaction() *Transaction {
 		undecided,
 		make(map[*Handle]*snapshot),
 		make(map[*Handle]*snapshot),
+		nil,
 	}
 }
 func (self *Transaction) getStatus() int32 {
@@ -122,76 +129,85 @@ func (self *Transaction) getStatus() int32 {
 }
 func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	version := h.getVersion()
-	if version.commitNumber > self.commitNumber {
-		return nil, fmt.Errorf("%v has changed", h.getVersion().content)
-	}
-	if version.lockedBy == nil {
-		return version, nil
-	}
-	other := version.lockedBy
-	if other.getStatus() == read_check {
-		if self.getStatus() != read_check || self.commitNumber > other.commitNumber {
-			other.Commit()
-		} else {
-			other.Abort()
+	for {
+		if version.commitNumber > self.commitNumber {
+			err = fmt.Errorf("%v has changed", h.getVersion().content)
+			break
 		}
-	}
-	if other.getStatus() == successful {
-		if other.commitNumber > self.commitNumber {
-			return nil, fmt.Errorf("%v has changed", other.writeHandles[h].neu.content)
+		if version.lockedBy == nil {
+			rval = version
+			break
 		}
-		return other.writeHandles[h].neu, nil
+		other := version.lockedBy
+		if other.getStatus() == read_check {
+			if self.getStatus() != read_check || self.commitNumber > other.commitNumber {
+				other.commit()
+			} else {
+				other.Abort()
+			}
+		}
+		if other.getStatus() != successful {
+			rval = version
+			break
+		}
+		version = h.getVersion()
 	}
-	return version, nil
+	return
 }
-func (self *Transaction) sortedWrites() []*Handle {
-	var rval handles
-	for handle, _ := range self.writeHandles {
-		rval = append(rval, handle)
+func (self *Transaction) sortWrites() {
+	if self.sortedWrites == nil && self.writeHandles != nil {
+		for handle, _ := range self.writeHandles {
+			self.sortedWrites = append(self.sortedWrites, write{handle, self.writeHandles[handle]})
+		}
+		sort.Sort(self.sortedWrites)
+		self.writeHandles = nil
+	} else {
+		panic(fmt.Errorf("%#v.sortWrites() called in illegal state!", self))
 	}
-	sort.Sort(rval)
-	return rval
 }
 func (self *Transaction) release() {
-	stat := self.getStatus()
-	if stat == successful {
-		self.commitNumber = atomic.AddUint64(&nextCommit, 1)
-	}
-	sw := self.sortedWrites()
-	for _, handle := range sw {
-		current := handle.getVersion()
-		for current.lockedBy == self {
-			snapshot := self.writeHandles[handle]
-			wanted := snapshot.old
-			if stat == successful {
-				wanted = snapshot.neu
-				wanted.commitNumber = self.commitNumber
-			}
-			if handle.replace(current, wanted) {
-				break
-			}
-			current = handle.getVersion()
+	if self.sortedWrites != nil && self.writeHandles == nil {
+		stat := self.getStatus()
+		if stat == successful {
+			self.commitNumber = atomic.AddUint64(&nextCommit, 1)
 		}
+		sw := self.sortedWrites
+		for _, w := range sw {
+			current := w.handle.getVersion()
+			for current.lockedBy == self {
+				wanted := w.snapshot.old
+				if stat == successful {
+					wanted = w.snapshot.neu
+					wanted.commitNumber = self.commitNumber
+				}
+				if w.handle.replace(current, wanted) {
+					break
+				}
+				current = w.handle.getVersion()
+			}
+		}
+	} else if self.sortedWrites == nil && self.writeHandles == nil {
+		// all is well, ignore me
+	} else {
+		panic(fmt.Errorf("%#v.release() called in illegal state!", self))
 	}
 }
 func (self *Transaction) acquire() bool {
-	sw := self.sortedWrites()
-	for _, handle := range sw {
+	for _, w := range self.sortedWrites {
 		for {
-			snapshot, _ := self.writeHandles[handle]
-			lockedVersion := snapshot.old.clone()
+			lockedVersion := w.snapshot.old.clone()
 			lockedVersion.lockedBy = self
-			if handle.replace(snapshot.old, lockedVersion) {
+			if w.handle.replace(w.snapshot.old, lockedVersion) {
 				break
 			}
-			current := handle.getVersion()
+			current := w.handle.getVersion()
 			if current.lockedBy == nil {
 				return false
 			}
 			if current.lockedBy == self {
 				break
 			}
-			current.lockedBy.Commit()
+			current.lockedBy.commit()
 		}
 	}
 	return true
@@ -204,11 +220,11 @@ func (self *Transaction) readCheck() bool {
 	}
 	return true
 }
-
 /*
- Commit the transaction. Will return whether the commit was successful or not.
+ commit the transaction without mutating anything inside it except with atomic
+ methods. Useful for other helpful Transactions.
 */
-func (self *Transaction) Commit() bool {
+func (self *Transaction) commit() bool {
 	if !self.acquire() {
 		self.Abort()
 		return false
@@ -221,6 +237,13 @@ func (self *Transaction) Commit() bool {
 	}
 	atomic.StoreInt32(&self.status, successful)
 	return self.getStatus() == successful
+}
+/*
+ Commit the transaction. Will return whether the commit was successful or not.
+*/
+func (self *Transaction) Commit() bool {
+	self.sortWrites()
+	return self.commit()
 }
 
 /*
