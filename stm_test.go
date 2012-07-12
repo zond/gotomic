@@ -176,6 +176,67 @@ func assertTreeStructure(t *testing.T, h *testNodeHandle, c *cmpNode) {
 	}
 }
 
+func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan bool) {
+	<- do
+	for i := 0; i < 10; i++ {
+		for {
+			v := fmt.Sprint(i, ".", x)
+			tr := NewTransaction()
+			if h.insert(tr, v) == nil {
+				if tr.Commit() {
+					break
+				}
+			}
+		}
+	}
+/*
+	for i := 0; i < 10; i++ {
+		for {
+			tr := NewTransaction()
+			v := fmt.Sprint(i, ".", x)
+			newH, err := h.remove(tr, v)
+			h = newH
+			if err == nil {
+				if tr.Commit() {
+					break
+				}
+			}
+		}
+	}
+*/
+	done <- true
+}
+
+func TestSTMConcurrentTestTree(t *testing.T) {
+	hc := newTestNodeHandle("c")
+	tr := NewTransaction()
+	if err := hc.insert(tr, "a"); err != nil {
+		t.Errorf("%v should insert 'a' but got %v", hc, err)
+	}
+	if err := hc.insert(tr, "d"); err != nil {
+		t.Errorf("%v should insert 'd' but got %v", hc, err)
+	}
+	if err := hc.insert(tr, "b"); err != nil {
+		t.Errorf("%v should insert 'b' but got %v", hc, err)
+	}
+	if !tr.Commit() {
+		t.Errorf("%v should commit", tr)
+	}
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
+	do := make(chan bool)
+	done := make(chan bool)
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go fiddleTestTree(t, fmt.Sprint(i), hc, do, done)
+	}
+	close(do)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		<- done
+	}
+	fmt.Println(hc)
+//	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
+}
+
 func TestSTMBasicTestTree(t *testing.T) {
 	hc := newTestNodeHandle("c")
 	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})

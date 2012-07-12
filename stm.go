@@ -226,7 +226,7 @@ func (self *Transaction) Abort() {
 	for {
 		current := self.getStatus()
 		if current == failed {
-			return
+			break
 		}
 		atomic.CompareAndSwapInt32(&self.status, current, failed)
 	}
