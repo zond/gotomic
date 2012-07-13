@@ -48,6 +48,28 @@ type testNodeHandle Handle
 func newTestNodeHandle(v string, parent *testNodeHandle) *testNodeHandle {
 	return (*testNodeHandle)(NewHandle(&testNode{v, parent, nil, nil}))
 }
+func (handle *testNodeHandle) has(t *Transaction, v string) (bool, error) {
+	self, err := handle.readNode(t)
+	if err != nil {
+		return false, err
+	}
+	cmp := compStrings(self.value, v)
+	if cmp > 0 {
+		if self.left != nil {
+			return self.left.has(t, v)
+		}
+		return false, nil
+	} else if cmp < 0 {
+		if self.right != nil {
+			return self.right.has(t, v)
+		}
+		return false, nil
+	}
+	if self.value == v {
+		return true, nil
+	}
+	return false, nil
+}
 func (handle *testNodeHandle) getNode(t *Transaction) *testNode {
 	node, err := handle.readNode(t)
 	if err != nil {
@@ -269,11 +291,23 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 	for i := 0; i < n; i++ {
 		v := fmt.Sprint(rand.Int63(), ".", i, ".", x)
 		vals[i] = v
-		for {
+		inserted := false
+		for !inserted {
 			tr := NewTransaction()
 			if h.insert(tr, v) == nil {
 				if tr.Commit() {
-					break
+					inserted = true
+					looked := false
+					for !looked {
+						tr = NewTransaction()
+ 						ok, err := h.has(tr, v)
+						if err == nil {
+							looked = true
+							if !ok {
+								fmt.Printf("%v should contain %v\n", h, v)
+							}
+						}
+					}
 				}
 			}
 		}
@@ -281,16 +315,28 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 	fmt.Println(x, "done inserting")
 	for i := 0; i < n; i++ {
 		v := vals[i]
-		for {
+		removed := false
+		for !removed {
 			tr := NewTransaction()
 			ok, err := h.remove(tr, v)
 			if err == nil {
 				if ok {
 					if tr.Commit() {
-						break
+						removed = true
+						looked := false
+						for !looked {
+							tr = NewTransaction()
+ 							ok, err := h.has(tr, v)
+							if err == nil {
+								looked = true
+								if ok {
+									fmt.Printf("%v should not contain %v\n", h, v)
+								}
+							}
+						}
 					}
 				} else {
-					fmt.Println("wth, ", v, "is not in", h)
+					fmt.Println("wtf, ", v, "is not in", h)
 				}
 			}
 		}
@@ -339,7 +385,17 @@ func TestSTMBigTestTree(t *testing.T) {
 		vals[i] = v
 		err := hc.insert(tr, v)
 		if err == nil {
-			if !tr.Commit() {
+			if tr.Commit() {
+				tr = NewTransaction()
+ 				ok, err := hc.has(tr, v)
+				if err == nil {
+					if !ok {
+						t.Errorf("%v should contain %v", hc, v)
+					}
+				} else {
+					t.Errorf("%v should be able to look for %v", hc, v)
+				}
+			} else {
 				t.Errorf("%v should commit", tr)
 			}
 		} else {
@@ -352,7 +408,17 @@ func TestSTMBigTestTree(t *testing.T) {
 		ok, err := hc.remove(tr, v)
 		if err == nil {
 			if ok {
-				if !tr.Commit() {
+				if tr.Commit() { 
+					tr = NewTransaction()
+ 					ok, err := hc.has(tr, v)
+					if err == nil {
+						if ok {
+							t.Errorf("%v should not contain %v", hc, v)
+						}
+					} else {
+						t.Errorf("%v should be able to look for %v", hc, v)
+					}
+				} else {
 					t.Errorf("%v should commit", tr)
 				}
 			} else {
