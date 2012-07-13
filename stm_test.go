@@ -85,43 +85,38 @@ func (handle *testNodeHandle) remove(t *Transaction, v string) (ok bool, err err
 		}
 	} else {
 		if self.right != nil && self.left != nil {
+			var succN *testNode
 			if rand.Float32() < 0.5 {
 				successor, err := self.left.farRight(t)
 				if err != nil {
 					return false, err
 				}
-				succN, err := successor.readNode(t)
+				succN, err = successor.readNode(t)
 				if err != nil {
 					return false, err
 				}
 				if err = successor.replaceInParent(t, succN.left); err != nil {
 					return false, err
 				}
-				self, err = handle.writeNode(t)
-				if err != nil {
-					return false, err
-				}
-				self.value = succN.value
-				ok = true
 			} else {
 				successor, err := self.right.farLeft(t)
 				if err != nil {
 					return false, err
 				}
-				succN, err := successor.readNode(t)
+				succN, err = successor.readNode(t)
 				if err != nil {
 					return false, err
 				}
 				if err = successor.replaceInParent(t, succN.right); err != nil {
 					return false, err
 				}
-				self, err = handle.writeNode(t)
-				if err != nil {
-					return false, err
-				}
-				self.value = succN.value
-				ok = true
 			}
+			self, err = handle.writeNode(t)
+			if err != nil {
+				return false, err
+			}
+			self.value = succN.value
+			ok = true
 		} else if self.right != nil {
 
 			if err = handle.replaceInParent(t, self.right); err != nil {
