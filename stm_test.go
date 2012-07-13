@@ -25,11 +25,15 @@ func compStrings(i, j string) int {
 	} else if len(i) > len(j) {
 		return 1
 	}
-	return 0
+	if i == j {
+		return 0
+	}
+	panic(fmt.Errorf("wtf, %v and %v are not the same!", i, j))
 }
 
 type testNode struct {
 	value string
+	parent *testNodeHandle
 	left  *testNodeHandle
 	right *testNodeHandle
 }
@@ -41,8 +45,8 @@ func (self *testNode) Clone() Clonable {
 
 type testNodeHandle Handle
 
-func newTestNodeHandle(v string) *testNodeHandle {
-	return (*testNodeHandle)(NewHandle(&testNode{v, nil, nil}))
+func newTestNodeHandle(v string, parent *testNodeHandle) *testNodeHandle {
+	return (*testNodeHandle)(NewHandle(&testNode{v, parent, nil, nil}))
 }
 func (handle *testNodeHandle) getNode(t *Transaction) *testNode {
 	node, err := handle.readNode(t)
@@ -65,54 +69,141 @@ func (handle *testNodeHandle) writeNode(t *Transaction) (*testNode, error) {
 	}
 	return node.(*testNode), nil
 }
-func (handle *testNodeHandle) remove(t *Transaction, v string) (newHandle *testNodeHandle, err error) {
-	self, err := handle.writeNode(t)
+func (handle *testNodeHandle) remove(t *Transaction, v string) (ok bool, err error) {
+	self, err := handle.readNode(t)
 	if err != nil {
-		return handle, err
+		return
 	}
 	cmp := compStrings(self.value, v)
 	if cmp > 0 {
 		if self.left != nil {
-			self.left, err = self.left.remove(t, v)
-			if err != nil {
-				return handle, err
-			}
+			return self.left.remove(t, v)
 		}
 	} else if cmp < 0 {
 		if self.right != nil {
-			self.right, err = self.right.remove(t, v)
-			if err != nil {
-				return handle, err
-			}
+			return self.right.remove(t, v)
 		}
 	} else {
-		if self.right == nil {
-			if self.left == nil {
-				return nil, nil
-			} else {
-				return self.left, nil
-			}
-		} else {
-			if self.left == nil {
-				return self.right, nil
-			} else {
-				if rand.Float32() > 0.5 {
-					return self.right, nil
+		if self.right != nil && self.left != nil {
+			if rand.Float32() < 0.5 {
+				successor, err := self.left.farRight(t)
+				if err != nil {
+					return false, err
 				}
+				succN, err := successor.readNode(t)
+				if err != nil {
+					return false, err
+				}
+				if err = successor.replaceInParent(t, succN.left); err != nil {
+					return false, err
+				}
+				self, err = handle.writeNode(t)
+				if err != nil {
+					return false, err
+				}
+				self.value = succN.value
+				ok = true
+			} else {
+				successor, err := self.right.farLeft(t)
+				if err != nil {
+					return false, err
+				}
+				succN, err := successor.readNode(t)
+				if err != nil {
+					return false, err
+				}
+				if err = successor.replaceInParent(t, succN.right); err != nil {
+					return false, err
+				}
+				self, err = handle.writeNode(t)
+				if err != nil {
+					return false, err
+				}
+				self.value = succN.value
+				ok = true
 			}
+		} else if self.right != nil {
+
+			if err = handle.replaceInParent(t, self.right); err != nil {
+				return false, err
+			}
+			ok = true
+		} else if self.left != nil {
+			if err = handle.replaceInParent(t, self.left); err != nil {
+				return false, err
+			}
+			ok = true
+		} else {
+			if err = handle.replaceInParent(t, nil); err != nil {
+				return false, err
+			}
+			ok = true
 		}
 	}
-	return handle, nil
+	return
 }
+func (handle *testNodeHandle) farRight(t *Transaction) (rval *testNodeHandle, err error) {
+	self, err := handle.readNode(t)
+	if err != nil {
+		return nil, err
+	}
+	if self.right == nil {
+		return handle, nil
+	}
+	return self.right.farRight(t)
+}
+func (handle *testNodeHandle) farLeft(t *Transaction) (rval *testNodeHandle, err error) {
+	self, err := handle.readNode(t)
+	if err != nil {
+		return nil, err
+	}
+	if self.left == nil {
+		return handle, nil
+	}
+	return self.left.farLeft(t)
+}
+func (handle *testNodeHandle) replaceInParent(t *Transaction, neu *testNodeHandle) error {
+	self, err := handle.readNode(t)
+	if err != nil {
+		return err
+	}
+	if self.parent == nil {
+		return fmt.Errorf("%#v.replaceInParent(...): I have no parent!")
+	}
+	parent, err := self.parent.writeNode(t)
+	if err != nil {
+		return err
+	}
+	if parent.left == handle {
+		parent.left = neu
+	} else if parent.right == handle {
+		parent.right = neu
+	} else {
+		panic(fmt.Errorf("%#v.replaceInParent(...): I don't seem to exist in my parent: %v", self, handle))
+	}
+	if neu != nil {
+		n, err := neu.writeNode(t)
+		if err != nil {
+			return err
+		}
+		n.parent = self.parent
+	}
+	return nil
+}
+
 func (handle *testNodeHandle) insert(t *Transaction, v string) error {
-	self, err := handle.writeNode(t)
+	self, err := handle.readNode(t)
 	if err != nil {
 		return err
 	}
 	cmp := compStrings(self.value, v)
 	if cmp > 0 {
 		if self.left == nil {
-			self.left = newTestNodeHandle(v)
+			self, err = handle.writeNode(t)
+			if err != nil {
+				return err
+			}
+			self.left = newTestNodeHandle(v, handle)
 		} else {
 			if err := self.left.insert(t, v); err != nil {
 				return err
@@ -120,7 +211,11 @@ func (handle *testNodeHandle) insert(t *Transaction, v string) error {
 		}
 	} else if cmp < 0 {
 		if self.right == nil {
-			self.right = newTestNodeHandle(v)
+			self, err = handle.writeNode(t)
+			if err != nil {
+				return err
+			}
+			self.right = newTestNodeHandle(v, handle)
 		} else {
 			if err := self.right.insert(t, v); err != nil {
 				return err
@@ -129,26 +224,23 @@ func (handle *testNodeHandle) insert(t *Transaction, v string) error {
 	}
 	return nil
 }
-func (handle *testNodeHandle) indentString(t *Transaction, i int) string {
-	self, err := handle.readNode(t)
-	if err != nil {
-		return err.Error()
-	}
+func (handle *testNodeHandle) indentString(i int) string {
+	self, _ := (*Handle)(handle).Current().(*testNode)
 	buf := new(bytes.Buffer)
 	for j := 0; j < i; j++ {
 		fmt.Fprint(buf, " ")
 	}
-	fmt.Fprintf(buf, "%#v", self)
+	fmt.Fprintf(buf, "%p:%#v", handle, self)
 	if self.left != nil {
-		fmt.Fprintf(buf, "\nl:%v", self.left.indentString(t, i+1))
+		fmt.Fprintf(buf, "\nl:%v", self.left.indentString(i+1))
 	}
 	if self.right != nil {
-		fmt.Fprintf(buf, "\nr:%v", self.right.indentString(t, i+1))
+		fmt.Fprintf(buf, "\nr:%v", self.right.indentString(i+1))
 	}
 	return string(buf.Bytes())
 }
 func (self *testNodeHandle) String() string {
-	return self.indentString(NewTransaction(), 0)
+	return self.indentString(0)
 }
 
 type cmpNode struct {
@@ -178,10 +270,12 @@ func assertTreeStructure(t *testing.T, h *testNodeHandle, c *cmpNode) {
 
 func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan bool) {
 	<- do
-	n := 10
+	n := int(1000 + rand.Int31() % 10000)
+	vals := make([]string, n)
 	for i := 0; i < n; i++ {
+		v := fmt.Sprint(rand.Int63(), ".", i, ".", x)
+		vals[i] = v
 		for {
-			v := fmt.Sprint(i, ".", x)
 			tr := NewTransaction()
 			if h.insert(tr, v) == nil {
 				if tr.Commit() {
@@ -189,25 +283,30 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 				}
 			}
 		}
-	}
+	} 
+	fmt.Println(x, "done inserting")
 	for i := 0; i < n; i++ {
+		v := vals[i]
 		for {
 			tr := NewTransaction()
-			v := fmt.Sprint(i, ".", x)
-			newH, err := h.remove(tr, v)
-			h = newH
+			ok, err := h.remove(tr, v)
 			if err == nil {
-				if tr.Commit() {
-					break
+				if ok {
+					if tr.Commit() {
+						break
+					}
+				} else {
+					fmt.Println("wth, ", v, "is not in", h)
 				}
 			}
 		}
 	}
+	fmt.Println(x, "done removing")
 	done <- true
 }
 
 func TestSTMConcurrentTestTree(t *testing.T) {
-	hc := newTestNodeHandle("c")
+	hc := newTestNodeHandle("c", nil)
 	tr := NewTransaction()
 	if err := hc.insert(tr, "a"); err != nil {
 		t.Errorf("%v should insert 'a' but got %v", hc, err)
@@ -232,12 +331,48 @@ func TestSTMConcurrentTestTree(t *testing.T) {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		<- done
 	}
-	fmt.Println(hc)
-//	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
+	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
+}
+
+func TestSTMBigTestTree(t *testing.T) {
+	hc := newTestNodeHandle("c", nil)
+	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
+	n := 10000
+	vals := make([]string, n)
+	for i := 0; i < n; i++ {
+		tr := NewTransaction()
+		v := fmt.Sprint(rand.Int63(), ".", i)
+		vals[i] = v
+		err := hc.insert(tr, v)
+		if err == nil {
+			if !tr.Commit() {
+				t.Errorf("%v should commit", tr)
+			}
+		} else {
+			t.Errorf("%v should insert %v but got %v", hc, v, err)
+		}
+	}
+	for i := 0; i < n; i++ {
+		tr := NewTransaction()
+		v := vals[i]
+		ok, err := hc.remove(tr, v)
+		if err == nil {
+			if ok {
+				if !tr.Commit() {
+					t.Errorf("%v should commit", tr)
+				}
+			} else {
+				t.Errorf("%v should remove %#v", hc, v)
+			}
+		} else {
+			t.Errorf("%v should remove %v but got %v", hc, v, err)
+		}
+	}
+	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
 }
 
 func TestSTMBasicTestTree(t *testing.T) {
-	hc := newTestNodeHandle("c")
+	hc := newTestNodeHandle("c", nil)
 	assertTreeStructure(t, hc, &cmpNode{"c", nil, nil})
 	tr := NewTransaction()
 	if err := hc.insert(tr, "a"); err != nil {
@@ -257,9 +392,9 @@ func TestSTMBasicTestTree(t *testing.T) {
 	}
 	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
 	tr = NewTransaction()
-	hc, err := hc.remove(tr, "d")
-	if err != nil {
-		t.Errorf("%v should remove 'd' but got", err)
+	ok, err := hc.remove(tr, "d")
+	if !ok || err != nil {
+		t.Errorf("%v should remove 'd' but got %v, %v", hc, ok, err)
 	}
 	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
 	if !tr.Commit() {
@@ -277,9 +412,9 @@ func TestSTMBasicTestTree(t *testing.T) {
 	}
 	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"e", nil, nil}})
 	tr = NewTransaction()
-	hc, err = hc.remove(tr, "a")
-	if err != nil {
-		t.Errorf("%v should remove 'a' but got", err)
+	ok, err = hc.remove(tr, "a")
+	if !ok || err != nil {
+		t.Errorf("%v should remove 'a' but got %v, %v", hc, ok, err)
 	}
 	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"e", nil, nil}})
 	if !tr.Commit() {
@@ -305,7 +440,7 @@ func tRead(t *testing.T, tr *Transaction, h *Handle) Thing {
 }
 
 func TestSTMIsolation(t *testing.T) {
-	h := NewHandle(&testNode{"a", nil, nil})
+	h := NewHandle(&testNode{"a", nil, nil, nil})
 	tr := NewTransaction()
 	n := tWrite(t, tr, h).(*testNode)
 	if n.value != "a" {
@@ -327,7 +462,7 @@ func TestSTMIsolation(t *testing.T) {
 }
 
 func TestSTMReadBreakage(t *testing.T) {
-	h := NewHandle(&testNode{"a", nil, nil})
+	h := NewHandle(&testNode{"a", nil, nil, nil})
 	tr := NewTransaction()
 	tr2 := NewTransaction()
 	n2 := tWrite(t, tr2, h).(*testNode)
@@ -346,9 +481,9 @@ func TestSTMReadBreakage(t *testing.T) {
 func TestSTMDiffTrans1(t *testing.T) {
 	tr1 := NewTransaction()
 	tr2 := NewTransaction()
-	h1 := NewHandle(&testNode{"a", nil, nil})
-	h2 := NewHandle(&testNode{"b", nil, nil})
-	h3 := NewHandle(&testNode{"c", nil, nil})
+	h1 := NewHandle(&testNode{"a", nil, nil, nil})
+	h2 := NewHandle(&testNode{"b", nil, nil, nil})
+	h3 := NewHandle(&testNode{"c", nil, nil, nil})
 	n11 := tRead(t, tr1, h1).(*testNode)
 	n12 := tRead(t, tr1, h2).(*testNode)
 	n22 := tRead(t, tr2, h2).(*testNode)
@@ -376,9 +511,9 @@ func TestSTMDiffTrans1(t *testing.T) {
 func TestSTMDiffTrans2(t *testing.T) {
 	tr1 := NewTransaction()
 	tr2 := NewTransaction()
-	h1 := NewHandle(&testNode{"a", nil, nil})
-	h2 := NewHandle(&testNode{"b", nil, nil})
-	h3 := NewHandle(&testNode{"c", nil, nil})
+	h1 := NewHandle(&testNode{"a", nil, nil, nil})
+	h2 := NewHandle(&testNode{"b", nil, nil, nil})
+	h3 := NewHandle(&testNode{"c", nil, nil, nil})
 	n11 := tWrite(t, tr1, h1).(*testNode)
 	n12 := tRead(t, tr1, h2).(*testNode)
 	n22 := tRead(t, tr2, h2).(*testNode)
@@ -415,9 +550,9 @@ func TestSTMDiffTrans2(t *testing.T) {
 func TestSTMDiffTrans3(t *testing.T) {
 	tr1 := NewTransaction()
 	tr2 := NewTransaction()
-	h1 := NewHandle(&testNode{"a", nil, nil})
-	h2 := NewHandle(&testNode{"b", nil, nil})
-	h3 := NewHandle(&testNode{"c", nil, nil})
+	h1 := NewHandle(&testNode{"a", nil, nil, nil})
+	h2 := NewHandle(&testNode{"b", nil, nil, nil})
+	h3 := NewHandle(&testNode{"c", nil, nil, nil})
 	n11 := tWrite(t, tr1, h1).(*testNode)
 	n12 := tWrite(t, tr1, h2).(*testNode)
 	n22 := tWrite(t, tr2, h2).(*testNode)
@@ -475,8 +610,8 @@ func TestSTMTransConcurrency(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	do := make(chan bool)
 	done := make(chan bool)
-	h1 := NewHandle(&testNode{"a", nil, nil})
-	h2 := NewHandle(&testNode{"a", nil, nil})
+	h1 := NewHandle(&testNode{"a", nil, nil, nil})
+	h2 := NewHandle(&testNode{"a", nil, nil, nil})
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go fiddleTrans(t, fmt.Sprint(i), h1, h2, do, done)
 	}
@@ -487,7 +622,7 @@ func TestSTMTransConcurrency(t *testing.T) {
 }
 
 func TestSTMCommit(t *testing.T) {
-	h := NewHandle(&testNode{"a", nil, nil})
+	h := NewHandle(&testNode{"a", nil, nil, nil})
 	tr := NewTransaction()
 	n := tWrite(t, tr, h).(*testNode)
 	if n.value != "a" {

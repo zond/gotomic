@@ -14,7 +14,7 @@ const (
 	failed
 )
 
-var nextCommit uint64 = 0
+var lastCommit uint64 = 0
 
 /*
  Clonable types can be handled by the transaction layer.
@@ -38,6 +38,12 @@ type Handle struct {
 */
 func NewHandle(c Clonable) *Handle {
 	return &Handle{unsafe.Pointer(&version{0, nil, c})}
+}
+/*
+ Current returns the current content of this Handler, disregarding any transactional state.
+*/
+func (self *Handle) Current() Clonable {
+	return self.getVersion().content
 }
 func (self *Handle) getVersion() *version {
 	return (*version)(atomic.LoadPointer(&self.Pointer))
@@ -117,7 +123,7 @@ type Transaction struct {
 
 func NewTransaction() *Transaction {
 	return &Transaction{
-		atomic.LoadUint64(&nextCommit),
+		atomic.LoadUint64(&lastCommit),
 		undecided,
 		make(map[*Handle]*snapshot),
 		make(map[*Handle]*snapshot),
@@ -154,42 +160,36 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	}
 	return
 }
+/*
+ sortWrites will put all writeHandles in sortedWrites and remove writeHandles.
+
+ _not_ safe to call multiple times!
+*/
 func (self *Transaction) sortWrites() {
-	if self.sortedWrites == nil && self.writeHandles != nil {
-		for handle, _ := range self.writeHandles {
-			self.sortedWrites = append(self.sortedWrites, write{handle, self.writeHandles[handle]})
-		}
-		sort.Sort(self.sortedWrites)
-		self.writeHandles = nil
-	} else {
-		panic(fmt.Errorf("%#v.sortWrites() called in illegal state!", self))
+	for handle, _ := range self.writeHandles {
+		self.sortedWrites = append(self.sortedWrites, write{handle, self.writeHandles[handle]})
 	}
+	sort.Sort(self.sortedWrites)
+	self.writeHandles = nil
 }
 func (self *Transaction) release() {
-	if self.sortedWrites != nil && self.writeHandles == nil {
-		stat := self.getStatus()
-		if stat == successful {
-			self.commitNumber = atomic.AddUint64(&nextCommit, 1)
-		}
-		sw := self.sortedWrites
-		for _, w := range sw {
-			current := w.handle.getVersion()
-			for current.lockedBy == self {
-				wanted := w.snapshot.old
-				if stat == successful {
-					wanted = w.snapshot.neu
-					wanted.commitNumber = self.commitNumber
-				}
-				if w.handle.replace(current, wanted) {
-					break
-				}
-				current = w.handle.getVersion()
+	stat := self.getStatus()
+	if stat == successful {
+		self.commitNumber = atomic.AddUint64(&lastCommit, 1)
+	}
+	for _, w := range self.sortedWrites {
+		current := w.handle.getVersion()
+		for current.lockedBy == self {
+			wanted := w.snapshot.old
+			if stat == successful {
+				wanted = w.snapshot.neu
+				wanted.commitNumber = self.commitNumber
 			}
+			if w.handle.replace(current, wanted) {
+				break
+			}
+			current = w.handle.getVersion()
 		}
-	} else if self.sortedWrites == nil && self.writeHandles == nil {
-		// all is well, ignore me
-	} else {
-		panic(fmt.Errorf("%#v.release() called in illegal state!", self))
 	}
 }
 func (self *Transaction) acquire() bool {
@@ -223,6 +223,8 @@ func (self *Transaction) readCheck() bool {
 /*
  commit the transaction without mutating anything inside it except with atomic
  methods. Useful for other helpful Transactions.
+
+ Safe to call multiple times (and it _will_ be if we have contention).
 */
 func (self *Transaction) commit() bool {
 	if !self.acquire() {
@@ -236,23 +238,41 @@ func (self *Transaction) commit() bool {
 		return false
 	}
 	atomic.StoreInt32(&self.status, successful)
-	return self.getStatus() == successful
+	return true
 }
 /*
  Commit the transaction. Will return whether the commit was successful or not.
+
+ Safe to call multiple times.
 */
 func (self *Transaction) Commit() bool {
-	self.sortWrites()
-	return self.commit()
+	status := self.getStatus()
+	if status == undecided {
+		self.sortWrites()
+		return self.commit()
+	} else if status == failed {
+		return false
+	} else if status == successful {
+		return true
+	} else if status == read_check {
+		return self.commit()
+	}
+	panic(fmt.Errorf("%#v has illegal state!"))
 }
 
 /*
- Abort the transaction.
+ Abort the transaction unless it is already successful.
 
- Unless the transaction is half-committed Abort isn't really necessary.
+ Safe to call multiple times.
+
+ Unless the transaction is half-committed Abort isn't really necessary, the gc will clean it up properly.
 */
 func (self *Transaction) Abort() {
-	atomic.StoreInt32(&self.status, failed)
+	stat := self.getStatus()
+	for stat != successful && stat != failed {
+		atomic.CompareAndSwapInt32(&self.status, stat, failed)
+		stat = self.getStatus()
+	}
 	self.release()
 }
 
