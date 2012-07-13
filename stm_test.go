@@ -118,7 +118,6 @@ func (handle *testNodeHandle) remove(t *Transaction, v string) (ok bool, err err
 			self.value = succN.value
 			ok = true
 		} else if self.right != nil {
-
 			if err = handle.replaceInParent(t, self.right); err != nil {
 				return false, err
 			}
@@ -174,7 +173,7 @@ func (handle *testNodeHandle) replaceInParent(t *Transaction, neu *testNodeHandl
 	} else if parent.right == handle {
 		parent.right = neu
 	} else {
-		panic(fmt.Errorf("%#v.replaceInParent(...): I don't seem to exist in my parent: %v", self, handle))
+		panic(fmt.Errorf("%#v.replaceInParent(...): I don't seem to exist in my parent: %#v", self, parent))
 	}
 	if neu != nil {
 		n, err := neu.writeNode(t)

@@ -174,9 +174,6 @@ func (self *Transaction) sortWrites() {
 }
 func (self *Transaction) release() {
 	stat := self.getStatus()
-	if stat == successful {
-		self.commitNumber = atomic.AddUint64(&lastCommit, 1)
-	}
 	for _, w := range self.sortedWrites {
 		current := w.handle.getVersion()
 		for current.lockedBy == self {
@@ -232,7 +229,9 @@ func (self *Transaction) commit() bool {
 		return false
 	}
 	defer self.release()
-	atomic.CompareAndSwapInt32(&self.status, undecided, read_check)
+	if atomic.CompareAndSwapInt32(&self.status, undecided, read_check) {
+		self.commitNumber = atomic.AddUint64(&lastCommit, 1)
+	}
 	if !self.readCheck() {
 		self.Abort()
 		return false
