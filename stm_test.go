@@ -312,7 +312,6 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 			}
 		}
 	} 
-	fmt.Println(x, "done inserting")
 	for i := 0; i < n; i++ {
 		v := vals[i]
 		removed := false
@@ -341,7 +340,6 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 			}
 		}
 	}
-	fmt.Println(x, "done removing")
 	done <- true
 }
 

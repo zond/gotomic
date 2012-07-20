@@ -39,6 +39,7 @@ type Handle struct {
 func NewHandle(c Clonable) *Handle {
 	return &Handle{unsafe.Pointer(&version{0, nil, c})}
 }
+
 /*
  Current returns the current content of this Handler, disregarding any transactional state.
 */
@@ -80,10 +81,11 @@ type snapshot struct {
 }
 
 type write struct {
-	handle *Handle
+	handle   *Handle
 	snapshot *snapshot
 }
 type writes []write
+
 func (self writes) Len() int {
 	return len(self)
 }
@@ -93,8 +95,6 @@ func (self writes) Swap(i, j int) {
 func (self writes) Less(i, j int) bool {
 	return uintptr(unsafe.Pointer(self[i].handle)) < uintptr(unsafe.Pointer(self[j].handle))
 }
-
-
 
 /*
  Transaction is based on "Concurrent Programming Without Locks" by Keir Fraser and Tim Harris <http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf>
@@ -152,14 +152,11 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 				other.Abort()
 			}
 		}
-		if other.getStatus() != successful {
-			rval = version
-			break
-		}
 		version = h.getVersion()
 	}
 	return
 }
+
 /*
  sortWrites will put all writeHandles in sortedWrites and remove writeHandles.
 
@@ -217,6 +214,7 @@ func (self *Transaction) readCheck() bool {
 	}
 	return true
 }
+
 /*
  commit the transaction without mutating anything inside it except with atomic
  methods. Useful for other helpful Transactions.
@@ -239,6 +237,7 @@ func (self *Transaction) commit() bool {
 	atomic.StoreInt32(&self.status, successful)
 	return true
 }
+
 /*
  Commit the transaction. Will return whether the commit was successful or not.
 
