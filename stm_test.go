@@ -286,7 +286,7 @@ func assertTreeStructure(t *testing.T, h *testNodeHandle, c *cmpNode) {
 
 func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan bool) {
 	<- do
-	n := int(1000 + rand.Int31() % 10000)
+	n := int(10000 + rand.Int31() % 1000)
 	vals := make([]string, n)
 	for i := 0; i < n; i++ {
 		v := fmt.Sprint(rand.Int63(), ".", i, ".", x)
