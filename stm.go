@@ -140,17 +140,15 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 			err = fmt.Errorf("%v has changed", h.getVersion().content)
 			break
 		}
-		if version.lockedBy == nil {
+		other := version.lockedBy
+		if other == nil {
 			rval = version
 			break
 		}
-		other := version.lockedBy
-		if other.getStatus() == read_check {
-			if self.getStatus() != read_check || self.commitNumber > other.commitNumber {
-				other.commit()
-			} else {
-				other.Abort()
-			}
+		if other.getStatus() == read_check && self.getStatus() == read_check && self.commitNumber < other.commitNumber {
+			other.Abort()
+		} else {
+			other.commit()
 		}
 		version = h.getVersion()
 	}
