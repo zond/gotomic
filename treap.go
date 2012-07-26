@@ -4,6 +4,7 @@ package gotomic
 import (
 	"math/rand"
 	"time"
+	"bytes"
 	"sync/atomic"
 	"fmt"
 )
@@ -52,7 +53,28 @@ func (self *Treap) wopen(t *Transaction) (*treap, error) {
 	}
 	return r.(*treap), nil
 }
-
+func (treap *Treap) Describe() string {
+	rval, err := treap.describe()
+	for err != nil {
+		rval, err = treap.describe()
+	}
+	return rval
+}
+func (treap *Treap) describe() (rval string, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	buf := bytes.NewBufferString(fmt.Sprintf("&Treap{%p size:%v}\n", treap, treap.size))
+	if self.root != nil {
+		err = self.root.describe(t, buf, 0)
+		if err != nil {
+			return
+		}
+	}
+	return string(buf.Bytes()), nil
+}
 func (treap *Treap) Put(k Comparable, v Thing) Thing {
 	rval, err := treap.put(k, v)
 	for err != nil {
@@ -77,9 +99,9 @@ func (treap *Treap) put(k Comparable, v Thing) (Thing, error) {
 			return nil, err
 		}
 		self.root = newRoot
-		if !t.Commit() {
-			return nil, fmt.Errorf("%v changed during put", treap)
-		}
+	}
+	if !t.Commit() {
+		return nil, fmt.Errorf("%v changed during put", treap)
 	}
 	atomic.AddInt64(&treap.size, 1)
 	return nil, nil
@@ -105,6 +127,29 @@ func (handle *nodeHandle) ropen(t *Transaction) (*node, error) {
 		return nil, err
 	}
 	return n.(*node), nil
+}
+func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int) error {
+	self, err := handle.ropen(t)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < indent; i++ {
+		fmt.Fprintf(buf, " ")
+	}
+	fmt.Fprintf(buf, "%v => %v (%v)\n", self.key, self.value, self.weight)
+	if self.left != nil {
+		err = self.left.describe(t, buf, indent + 1)
+		if err != nil {
+			return err
+		}
+	}
+	if self.right != nil {
+		err = self.right.describe(t, buf, indent + 1)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (handle *nodeHandle) wopen(t *Transaction) (*node, error) {
 	r, err := t.Write((*Handle)(handle))
@@ -148,6 +193,7 @@ func (handle *nodeHandle) rotateRight(t *Transaction) (result *nodeHandle, err e
 }
 func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result *nodeHandle, err error) {
 	if handle == nil {
+		fmt.Printf("returning plain %v\n", newHandle)
 		return newHandle, nil
 	}
 	result = handle
@@ -161,6 +207,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 	}
 	switch cmp := newNode.key.Compare(self.key); {
 	case cmp < 0:
+		fmt.Printf("inserting %v in left of %v\n", newNode, self)
 		var newLeft *nodeHandle
 		newLeft, err = self.left.insert(t, newHandle)
 		if err != nil {
@@ -185,12 +232,14 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 			}
 		}
 	case cmp > 0:
+		fmt.Printf("inserting %v in right of %v\n", newNode, self)
 		var newRight *nodeHandle
 		newRight, err = self.right.insert(t, newHandle)
 		if err != nil {
 			return
 		}
 		if newRight != self.right {
+			fmt.Println("ok, newRight is different from old right")
 			self, err = handle.wopen(t)
 			if err != nil {
 				return
