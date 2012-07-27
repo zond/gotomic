@@ -23,6 +23,45 @@ func (self *treap) Clone() Clonable {
 	return &treap{self.root}
 }
 
+func merge(t *Transaction, left, right *nodeHandle) (result *nodeHandle, err error) {
+	if left == nil {
+		result = right
+		return
+	}
+	if right == nil {
+		result = left
+		return
+	}
+	var leftNode, rightNode *node
+	var subMerge *nodeHandle
+	if left.weight < right.weight {
+		leftNode, err = left.wopen(t)
+		if err != nil {
+			return
+		}
+		result = left
+		tmp := leftNode.right
+		subMerge, err = merge(t, tmp, right)
+		if err != nil {
+			return
+		}
+		leftNode.right = subMerge
+		return
+	}
+	rightNode, err = right.wopen(t)
+	if err != nil {
+		return
+	}
+	result = right
+	tmp := rightNode.left
+	subMerge, err = merge(t, left, tmp)
+	if err != nil {
+		return
+	}
+	rightNode.left = subMerge
+	return
+}
+
 /*
  Non-transaction controlled "user space" type
  */
@@ -111,8 +150,6 @@ func (treap *Treap) put(k Comparable, v Thing) (Thing, error) {
 type node struct {
 	left *nodeHandle
 	right *nodeHandle
-	weight int32
-	key Comparable
 	value Thing
 }
 func (self *node) Clone() Clonable {
@@ -120,13 +157,24 @@ func (self *node) Clone() Clonable {
 	return &rval
 }
 
-type nodeHandle Handle
+type nodeHandle struct {
+	*Handle
+	key Comparable
+	weight int32
+}
 func (handle *nodeHandle) ropen(t *Transaction) (*node, error) {
-	n, err := t.Read((*Handle)(handle))
+	n, err := t.Read((*Handle)(handle.Handle))
 	if err != nil {
 		return nil, err
 	}
 	return n.(*node), nil
+}
+func (handle *nodeHandle) wopen(t *Transaction) (*node, error) {
+	r, err := t.Write((*Handle)(handle.Handle))
+	if err != nil {
+		return nil, err
+	}
+	return r.(*node), nil
 }
 func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int) error {
 	self, err := handle.ropen(t)
@@ -136,7 +184,7 @@ func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int
 	for i := 0; i < indent; i++ {
 		fmt.Fprintf(buf, " ")
 	}
-	fmt.Fprintf(buf, "%v => %v (%v)\n", self.key, self.value, self.weight)
+	fmt.Fprintf(buf, "%v => %v (%v)\n", handle.key, self.value, handle.weight)
 	if self.left != nil {
 		fmt.Fprintf(buf, "l:")
 		err = self.left.describe(t, buf, indent + 1)
@@ -153,15 +201,8 @@ func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int
 	}
 	return nil
 }
-func (handle *nodeHandle) wopen(t *Transaction) (*node, error) {
-	r, err := t.Write((*Handle)(handle))
-	if err != nil {
-		return nil, err
-	}
-	return r.(*node), nil
-}
 func newNodeHandle(k Comparable, v Thing) *nodeHandle {
-	return (*nodeHandle)(NewHandle(&node{nil, nil, rand.Int31(), k, v}))
+	return &nodeHandle{NewHandle(&node{nil, nil, v}), k, rand.Int31()}
 }
 func (handle *nodeHandle) rotateLeft(t *Transaction) (result *nodeHandle, err error) {
 	self, err := handle.wopen(t)
@@ -202,11 +243,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 	if err != nil {
 		return
 	}
-	newNode, err := newHandle.ropen(t)
-	if err != nil {
-		return 
-	}
-	switch cmp := newNode.key.Compare(self.key); {
+	switch cmp := newHandle.key.Compare(handle.key); {
 	case cmp < 0:
 		var newLeft *nodeHandle
 		newLeft, err = self.left.insert(t, newHandle)
@@ -219,12 +256,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 				return
 			}
 			self.left = newLeft
-			var leftNode *node
-			leftNode, err = self.left.ropen(t)
-			if err != nil {
-				return
-			}
-			if leftNode.weight < self.weight {
+			if newLeft.weight < handle.weight {
 				result, err = handle.rotateLeft(t)
 				if err != nil {
 					return
@@ -243,9 +275,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 				return
 			}
 			self.right = newRight
-			var rightNode *node
-			rightNode, err = self.right.ropen(t)
-			if rightNode.weight < self.weight {
+			if newRight.weight < handle.weight {
 				result, err = handle.rotateRight(t)
 				if err != nil {
 					return
@@ -255,9 +285,13 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 	default:
 		if self, err = handle.wopen(t); err != nil {
 			return nil, err
-		} else {
-			self.value = newNode.value
 		}
+		var newNode *node
+		newNode, err = newHandle.ropen(t)
+		if err != nil {
+			return 
+		}
+		self.value = newNode.value
 	}	
 	return
 }
