@@ -114,36 +114,71 @@ func (treap *Treap) describe() (rval string, err error) {
 	}
 	return string(buf.Bytes()), nil
 }
-func (treap *Treap) Put(k Comparable, v Thing) Thing {
-	rval, err := treap.put(k, v)
+func (treap *Treap) Delete(k Comparable) (old Thing, ok bool) {
+	old, ok, err := treap.del(k)
 	for err != nil {
-		rval, err = treap.put(k, v)
+		old, ok, err = treap.del(k)
 	}
-	return rval
+	return
 }
-func (treap *Treap) put(k Comparable, v Thing) (old Thing, err error) {
+func (treap *Treap) del(k Comparable) (old Thing, ok bool, err error) {
 	t := NewTransaction()
 	self, err := treap.ropen(t)
 	if err != nil {
 		return
 	}
-	newNode := newNodeHandle(k, v)
-	newRoot, old, err := self.root.insert(t, newNode)
+	if self.root == nil {
+		ok = true
+		return
+	}
+	newRoot, old, ok, err := self.root.del(t, k)
 	if err != nil {
 		return
 	}
 	if newRoot != self.root {
 		self, err = treap.wopen(t)
 		if err != nil {
-			return nil, err
+			return
 		}
 		self.root = newRoot
 	}
 	if !t.Commit() {
-		return nil, fmt.Errorf("%v changed during put", treap)
+		err = fmt.Errorf("%v changed during delete", treap)
+		return 
+	}
+	atomic.AddInt64(&treap.size, -1)
+	return
+}
+func (treap *Treap) Put(k Comparable, v Thing) (old Thing, ok bool) {
+	old, ok, err := treap.put(k, v)
+	for err != nil {
+		old, ok, err = treap.put(k, v)
+	}
+	return
+}
+func (treap *Treap) put(k Comparable, v Thing) (old Thing, ok bool, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	newNode := newNodeHandle(k, v)
+	newRoot, old, ok, err := self.root.insert(t, newNode)
+	if err != nil {
+		return
+	}
+	if newRoot != self.root {
+		self, err = treap.wopen(t)
+		if err != nil {
+			return
+		}
+		self.root = newRoot
+	}
+	if !t.Commit() {
+		err = fmt.Errorf("%v changed during put", treap)
 	}
 	atomic.AddInt64(&treap.size, 1)
-	return nil, nil
+	return
 }
 
 
@@ -234,8 +269,56 @@ func (handle *nodeHandle) rotateRight(t *Transaction) (result *nodeHandle, err e
 	self.right = tmp
 	return
 }
-func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result *nodeHandle, old Thing, err error) {
+func (handle *nodeHandle) del(t *Transaction, k Comparable) (result *nodeHandle, old Thing, ok bool, err error) {
 	if handle == nil {
+		ok = false
+		return
+	}
+	result = handle
+	self, err := handle.ropen(t) 
+	if err != nil {
+		return
+	}
+	switch cmp := k.Compare(handle.key); {
+	case cmp < 0:
+		var newLeft *nodeHandle
+		newLeft, old, ok, err = self.left.del(t, k)
+		if err != nil {
+			return
+		}
+		if newLeft != self.left {
+			self, err = handle.wopen(t)
+			if err != nil {
+				return
+			}
+			self.left = newLeft
+		}
+	case cmp > 0:
+		var newRight *nodeHandle
+		newRight, old, ok, err = self.right.del(t, k)
+		if err != nil {
+			return
+		}
+		if newRight != self.right {
+			self, err = handle.wopen(t)
+			if err != nil {
+				return
+			}
+			self.right = newRight
+		}
+	default:
+		ok = true
+		old = self.value
+		result, err = merge(t, self.left, self.right)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result *nodeHandle, old Thing, ok bool, err error) {
+	if handle == nil {
+		ok = false
 		result = newHandle
 		return
 	}
@@ -247,7 +330,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 	switch cmp := newHandle.key.Compare(handle.key); {
 	case cmp < 0:
 		var newLeft *nodeHandle
-		newLeft, old, err = self.left.insert(t, newHandle)
+		newLeft, old, ok, err = self.left.insert(t, newHandle)
 		if err != nil {
 			return
 		}
@@ -266,7 +349,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 		}
 	case cmp > 0:
 		var newRight *nodeHandle
-		newRight, old, err = self.right.insert(t, newHandle)
+		newRight, old, ok, err = self.right.insert(t, newHandle)
 		if err != nil {
 			return
 		}
@@ -293,6 +376,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 			return 
 		}
 		old = self.value
+		ok = true
 		self.value = newNode.value
 	}	
 	return
