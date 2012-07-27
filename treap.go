@@ -121,16 +121,16 @@ func (treap *Treap) Put(k Comparable, v Thing) Thing {
 	}
 	return rval
 }
-func (treap *Treap) put(k Comparable, v Thing) (Thing, error) {
+func (treap *Treap) put(k Comparable, v Thing) (old Thing, err error) {
 	t := NewTransaction()
 	self, err := treap.ropen(t)
 	if err != nil {
-		return nil, err
+		return
 	}
 	newNode := newNodeHandle(k, v)
-	newRoot, err := self.root.insert(t, newNode)
+	newRoot, old, err := self.root.insert(t, newNode)
 	if err != nil {
-		return nil, err
+		return
 	}
 	if newRoot != self.root {
 		self, err = treap.wopen(t)
@@ -234,9 +234,10 @@ func (handle *nodeHandle) rotateRight(t *Transaction) (result *nodeHandle, err e
 	self.right = tmp
 	return
 }
-func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result *nodeHandle, err error) {
+func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result *nodeHandle, old Thing, err error) {
 	if handle == nil {
-		return newHandle, nil
+		result = newHandle
+		return
 	}
 	result = handle
 	self, err := handle.ropen(t)
@@ -246,7 +247,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 	switch cmp := newHandle.key.Compare(handle.key); {
 	case cmp < 0:
 		var newLeft *nodeHandle
-		newLeft, err = self.left.insert(t, newHandle)
+		newLeft, old, err = self.left.insert(t, newHandle)
 		if err != nil {
 			return
 		}
@@ -265,7 +266,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 		}
 	case cmp > 0:
 		var newRight *nodeHandle
-		newRight, err = self.right.insert(t, newHandle)
+		newRight, old, err = self.right.insert(t, newHandle)
 		if err != nil {
 			return
 		}
@@ -284,13 +285,14 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 		}
 	default:
 		if self, err = handle.wopen(t); err != nil {
-			return nil, err
+			return
 		}
 		var newNode *node
 		newNode, err = newHandle.ropen(t)
 		if err != nil {
 			return 
 		}
+		old = self.value
 		self.value = newNode.value
 	}	
 	return
