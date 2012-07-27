@@ -138,12 +138,14 @@ func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int
 	}
 	fmt.Fprintf(buf, "%v => %v (%v)\n", self.key, self.value, self.weight)
 	if self.left != nil {
+		fmt.Fprintf(buf, "l:")
 		err = self.left.describe(t, buf, indent + 1)
 		if err != nil {
 			return err
 		}
 	}
 	if self.right != nil {
+		fmt.Fprintf(buf, "r:")
 		err = self.right.describe(t, buf, indent + 1)
 		if err != nil {
 			return err
@@ -193,7 +195,6 @@ func (handle *nodeHandle) rotateRight(t *Transaction) (result *nodeHandle, err e
 }
 func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result *nodeHandle, err error) {
 	if handle == nil {
-		fmt.Printf("returning plain %v\n", newHandle)
 		return newHandle, nil
 	}
 	result = handle
@@ -207,7 +208,6 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 	}
 	switch cmp := newNode.key.Compare(self.key); {
 	case cmp < 0:
-		fmt.Printf("inserting %v in left of %v\n", newNode, self)
 		var newLeft *nodeHandle
 		newLeft, err = self.left.insert(t, newHandle)
 		if err != nil {
@@ -232,14 +232,12 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 			}
 		}
 	case cmp > 0:
-		fmt.Printf("inserting %v in right of %v\n", newNode, self)
 		var newRight *nodeHandle
 		newRight, err = self.right.insert(t, newHandle)
 		if err != nil {
 			return
 		}
 		if newRight != self.right {
-			fmt.Println("ok, newRight is different from old right")
 			self, err = handle.wopen(t)
 			if err != nil {
 				return
@@ -261,7 +259,7 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 			self.value = newNode.value
 		}
 	}	
-	return handle, nil
+	return
 }
 
 	
