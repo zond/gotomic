@@ -4,7 +4,44 @@ package gotomic
 import (
 	"testing"
 	"reflect"
+	"fmt"
 )
+
+func TestTreapPreviousNext(t *testing.T) {
+	treap := NewTreap()
+	for i := 9; i >= 0; i-- {
+		treap.Put(c(i), fmt.Sprint(i))
+	}
+	assertTreapSlice(t, treap, []Comparable{c(0), c(1), c(2), c(3), c(4), c(5), c(6), c(7), c(8), c(9)}, []Thing{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}) 
+	k, v, ok := treap.Next(c(4))
+	if !ok {
+		t.Error("should have something after 4")
+	}
+	if k != c(5) {
+		t.Error("5 should be after 4")
+	}
+	if v != "5" {
+		t.Error("5 should be after 4")
+	}
+	k, v, ok = treap.Previous(c(7))
+	if !ok {
+		t.Error("should have something before 7")
+	}
+	if k != c(6) {
+		t.Error("6 should be before 7")
+	}
+	if v != "6" {
+		t.Error("6 should be before 7")
+	}
+	k, v, ok = treap.Previous(c(0))
+	if ok {
+		t.Error("should not have anything before 0")
+	}
+	k, v, ok = treap.Next(c(9))
+	if ok {
+		t.Error("should not have anything after 9")
+	}
+}
 
 func TestTreapPutGetDelete(t *testing.T) {
 	treap := NewTreap()

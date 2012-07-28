@@ -13,6 +13,18 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+type match struct {
+	previousOk bool
+	previousKey Comparable
+	previousValue Thing
+	matchOk bool
+	matchKey Comparable
+	matchValue Thing
+	nextOk bool
+	nextKey Comparable
+	nextValue Thing
+}
+
 type TreapIterator func(k Comparable, v Thing)
 
 /*
@@ -183,6 +195,54 @@ func (treap *Treap) Each(iter TreapIterator) (err error) {
 	err = self.root.each(t, iter)
 	return
 }
+func (treap *Treap) Next(k Comparable) (key Comparable, value Thing, ok bool) {
+	key, value, ok, err := treap.next(k)
+	for err != nil {
+		key, value, ok, err = treap.next(k)
+	}
+	return
+}
+func (treap *Treap) next(k Comparable) (key Comparable, value Thing, ok bool, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.root == nil {
+		ok = true
+		return
+	}
+	m := &match{}
+	err = self.root.get(t, k, m, false, true)
+	key = m.nextKey
+	value = m.nextValue
+	ok = m.nextOk
+	return
+}
+func (treap *Treap) Previous(k Comparable) (key Comparable, value Thing, ok bool) {
+	key, value, ok, err := treap.previous(k)
+	for err != nil {
+		key, value, ok, err = treap.previous(k)
+	}
+	return
+}
+func (treap *Treap) previous(k Comparable) (key Comparable, value Thing, ok bool, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.root == nil {
+		ok = true
+		return
+	}
+	m := &match{}
+	err = self.root.get(t, k, m, true, false)
+	key = m.previousKey
+	value = m.previousValue
+	ok = m.previousOk
+	return
+}
 func (treap *Treap) Get(k Comparable) (v Thing, ok bool) {
 	v, ok, err := treap.get(k)
 	for err != nil {
@@ -197,12 +257,12 @@ func (treap *Treap) get(k Comparable) (v Thing, ok bool, err error) {
 		return
 	}
 	if self.root == nil {
-		ok = false
 		return
 	}
 	m := &match{}
-	ok, err = self.root.get(t, k, m)
+	err = self.root.get(t, k, m, false, false)
 	v = m.matchValue
+	ok = m.matchOk
 	return
 }
 func (treap *Treap) Min() (k Comparable, v Thing, ok bool) {
@@ -302,14 +362,6 @@ func (handle *nodeHandle) wopen(t *Transaction) (*node, error) {
 	}
 	return r.(*node), nil
 }
-type match struct {
-	beforeKey Comparable
-	beforeValue Thing
-	matchKey Comparable
-	matchValue Thing
-	afterKey Comparable
-	afterValue Thing
-}
 func (handle *nodeHandle) each(t *Transaction, iter TreapIterator) (err error) {
 	if handle == nil {
 		return
@@ -326,9 +378,8 @@ func (handle *nodeHandle) each(t *Transaction, iter TreapIterator) (err error) {
 	err = self.right.each(t, iter)
 	return
 }
-func (handle *nodeHandle) get(t *Transaction, k Comparable, m *match) (ok bool, err error) {
+func (handle *nodeHandle) get(t *Transaction, k Comparable, m *match, previous, next bool) (err error) {
 	if handle == nil {
-		ok = false
 		return
 	}
 	self, err := handle.ropen(t)
@@ -337,27 +388,39 @@ func (handle *nodeHandle) get(t *Transaction, k Comparable, m *match) (ok bool, 
 	}
 	switch cmp := k.Compare(handle.key); {
 	case cmp < 0:
-		m.afterKey = handle.key
-		m.afterValue = self.value
-		ok, err = self.left.get(t, k, m)
+		if next {
+			m.nextKey = handle.key
+			m.nextValue = self.value
+			m.nextOk = true
+		}
+		err = self.left.get(t, k, m, previous, next)
 	case cmp > 0:
-		m.beforeKey = handle.key
-		m.beforeValue = self.value
-		ok, err = self.right.get(t, k, m)
+		if previous {
+			m.previousKey = handle.key
+			m.previousValue = self.value
+			m.previousOk = true
+		}
+		err = self.right.get(t, k, m, previous, next)
 	default:
 		m.matchKey = handle.key
 		m.matchValue = self.value
-		ok = true
-		if self.left != nil {
-			m.beforeKey, m.beforeValue, err = self.left.max(t)
-			if err != nil {
-				return
+		m.matchOk = true
+		if previous {
+			if self.left != nil {
+				m.previousKey, m.previousValue, err = self.left.max(t)
+				if err != nil {
+					return
+				}
+				m.previousOk = true
 			}
 		}
-		if self.right != nil {
-			m.afterKey, m.afterValue, err = self.right.min(t)
-			if err != nil {
-				return
+		if next {
+			if self.right != nil {
+				m.nextKey, m.nextValue, err = self.right.min(t)
+				if err != nil {
+					return
+				}
+				m.nextOk = true
 			}
 		}
 	}
