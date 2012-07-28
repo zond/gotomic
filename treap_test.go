@@ -3,6 +3,7 @@ package gotomic
 
 import (
 	"testing"
+	"reflect"
 )
 
 func TestTreapPutGetDelete(t *testing.T) {
@@ -37,6 +38,26 @@ func TestTreapPutGetDelete(t *testing.T) {
 	if ok {
 		t.Error("should not contain 3")
 	}
+}
+
+func assertTreapSlice(t *testing.T, treap *Treap, keys []Comparable, values []Thing) {
+	found_keys, found_values := treap.ToSlice()
+	if !reflect.DeepEqual(keys, found_keys) {
+		t.Errorf("%v.ToSlice keys should be %#v but was %#v", treap, keys, found_keys)
+	}
+	if !reflect.DeepEqual(values, found_values) {
+		t.Errorf("%v.ToSlice values should be %#v but was %#v", treap, values, found_values)
+	}
+}
+
+func TestTreapToSlice(t *testing.T) {
+	treap := NewTreap()
+	treap.Put(c(4), "4")
+	treap.Put(c(6), "6")
+	treap.Put(c(1), "1")
+	treap.Put(c(8), "8")
+	treap.Put(c(5), "5")
+	assertTreapSlice(t, treap, []Comparable{c(1), c(4), c(5), c(6), c(8)}, []Thing{"1", "4", "5", "6", "8"})
 }
 
 func TestTreapMin(t *testing.T) {

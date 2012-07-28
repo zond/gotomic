@@ -13,6 +13,8 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+type TreapIterator func(k Comparable, v Thing)
+
 /*
  Transaction controlled treap
  */
@@ -156,6 +158,31 @@ func (treap *Treap) Put(k Comparable, v Thing) (old Thing, ok bool) {
 	}
 	return
 }
+func (treap *Treap) ToSlice() (keys []Comparable, values []Thing) {
+	iter := func(k Comparable, v Thing) {
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+	err := treap.Each(iter)
+	for err != nil {
+		keys = nil
+		values = nil
+		err = treap.Each(iter)
+	}
+	return
+}
+func (treap *Treap) Each(iter TreapIterator) (err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.root == nil {
+		return
+	}
+	err = self.root.each(t, iter)
+	return
+}
 func (treap *Treap) Get(k Comparable) (v Thing, ok bool) {
 	v, ok, err := treap.get(k)
 	for err != nil {
@@ -173,7 +200,9 @@ func (treap *Treap) get(k Comparable) (v Thing, ok bool, err error) {
 		ok = false
 		return
 	}
-	v, ok, err = self.root.get(t, k)
+	m := &match{}
+	ok, err = self.root.get(t, k, m)
+	v = m.matchValue
 	return
 }
 func (treap *Treap) Min() (k Comparable, v Thing, ok bool) {
@@ -193,7 +222,8 @@ func (treap *Treap) min() (k Comparable, v Thing, ok bool, err error) {
 		ok = false
 		return
 	}
-	k, v, ok, err = self.root.min(t)
+	ok = true
+	k, v, err = self.root.min(t)
 	return
 }
 func (treap *Treap) Max() (k Comparable, v Thing, ok bool) {
@@ -213,7 +243,8 @@ func (treap *Treap) max() (k Comparable, v Thing, ok bool, err error) {
 		ok = false
 		return
 	}
-	k, v, ok, err = self.root.max(t)
+	ok = true
+	k, v, err = self.root.max(t)
 	return
 }
 func (treap *Treap) put(k Comparable, v Thing) (old Thing, ok bool, err error) {
@@ -271,7 +302,31 @@ func (handle *nodeHandle) wopen(t *Transaction) (*node, error) {
 	}
 	return r.(*node), nil
 }
-func (handle *nodeHandle) get(t *Transaction, k Comparable) (v Thing, ok bool, err error) {
+type match struct {
+	beforeKey Comparable
+	beforeValue Thing
+	matchKey Comparable
+	matchValue Thing
+	afterKey Comparable
+	afterValue Thing
+}
+func (handle *nodeHandle) each(t *Transaction, iter TreapIterator) (err error) {
+	if handle == nil {
+		return
+	}
+	self, err := handle.ropen(t)
+	if err != nil {
+		return
+	}
+	err = self.left.each(t, iter)
+	if err != nil {
+		return
+	}
+	iter(handle.key, self.value)
+	err = self.right.each(t, iter)
+	return
+}
+func (handle *nodeHandle) get(t *Transaction, k Comparable, m *match) (ok bool, err error) {
 	if handle == nil {
 		ok = false
 		return
@@ -282,16 +337,33 @@ func (handle *nodeHandle) get(t *Transaction, k Comparable) (v Thing, ok bool, e
 	}
 	switch cmp := k.Compare(handle.key); {
 	case cmp < 0:
-		v, ok, err = self.left.get(t, k)
+		m.afterKey = handle.key
+		m.afterValue = self.value
+		ok, err = self.left.get(t, k, m)
 	case cmp > 0:
-		v, ok, err = self.right.get(t, k)
+		m.beforeKey = handle.key
+		m.beforeValue = self.value
+		ok, err = self.right.get(t, k, m)
 	default:
-		v = self.value
+		m.matchKey = handle.key
+		m.matchValue = self.value
 		ok = true
+		if self.left != nil {
+			m.beforeKey, m.beforeValue, err = self.left.max(t)
+			if err != nil {
+				return
+			}
+		}
+		if self.right != nil {
+			m.afterKey, m.afterValue, err = self.right.min(t)
+			if err != nil {
+				return
+			}
+		}
 	}
 	return
 }
-func (handle *nodeHandle) min(t *Transaction) (k Comparable, v Thing, ok bool, err error) {
+func (handle *nodeHandle) min(t *Transaction) (k Comparable, v Thing, err error) {
 	self, err := handle.ropen(t)
 	if err != nil {
 		return
@@ -299,12 +371,11 @@ func (handle *nodeHandle) min(t *Transaction) (k Comparable, v Thing, ok bool, e
 	if self.left == nil {
 		k = handle.key
 		v = self.value
-		ok = true
 		return
 	}
 	return self.left.min(t)
 }
-func (handle *nodeHandle) max(t *Transaction) (k Comparable, v Thing, ok bool, err error) {
+func (handle *nodeHandle) max(t *Transaction) (k Comparable, v Thing, err error) {
 	self, err := handle.ropen(t)
 	if err != nil {
 		return
@@ -312,7 +383,6 @@ func (handle *nodeHandle) max(t *Transaction) (k Comparable, v Thing, ok bool, e
 	if self.right == nil {
 		k = handle.key
 		v = self.value
-		ok = true
 		return
 	}
 	return self.right.max(t)
