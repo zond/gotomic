@@ -315,7 +315,7 @@ func (handle *nodeHandle) max(t *Transaction) (k Comparable, v Thing, ok bool, e
 		ok = true
 		return
 	}
-	return self.left.max(t)
+	return self.right.max(t)
 }
 func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int) error {
 	self, err := handle.ropen(t)

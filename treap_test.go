@@ -79,3 +79,44 @@ func TestTreapMin(t *testing.T) {
 		t.Error("min should be 2")
 	}
 }
+
+func TestTreapMax(t *testing.T) {
+	treap := NewTreap()
+	k, v, ok := treap.Max()
+	if ok {
+		t.Error("should not have max value")
+	}
+	treap.Put(c(3), "3")
+	k, v, ok = treap.Max()
+	if !ok {
+		t.Error("should have max value")
+	}
+	if k != c(3) {
+		t.Error("max should be 3")
+	}
+	if v != "3" {
+		t.Error("max should be 3")
+	}
+	treap.Put(c(2), "2")
+	k, v, ok = treap.Max()
+	if !ok {
+		t.Error("should have max value")
+	}
+	if k != c(3) {
+		t.Error("max should be 3")
+	}
+	if v != "3" {
+		t.Errorf("max should be 3, not %#v", v)
+	}
+	treap.Put(c(4), "4")
+	k, v, ok = treap.Max()
+	if !ok {
+		t.Error("should have max value")
+	}
+	if k != c(4) {
+		t.Error("max should be 4")
+	}
+	if v != "4" {
+		t.Error("max should be 4")
+	}
+}
