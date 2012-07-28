@@ -128,7 +128,7 @@ func (treap *Treap) del(k Comparable) (old Thing, ok bool, err error) {
 		return
 	}
 	if self.root == nil {
-		ok = true
+		ok = false
 		return
 	}
 	newRoot, old, ok, err := self.root.del(t, k)
@@ -154,6 +154,66 @@ func (treap *Treap) Put(k Comparable, v Thing) (old Thing, ok bool) {
 	for err != nil {
 		old, ok, err = treap.put(k, v)
 	}
+	return
+}
+func (treap *Treap) Get(k Comparable) (v Thing, ok bool) {
+	v, ok, err := treap.get(k)
+	for err != nil {
+		v, ok, err = treap.get(k)
+	}
+	return
+}
+func (treap *Treap) get(k Comparable) (v Thing, ok bool, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.root == nil {
+		ok = false
+		return
+	}
+	v, ok, err = self.root.get(t, k)
+	return
+}
+func (treap *Treap) Min() (k Comparable, v Thing, ok bool) {
+	k, v, ok, err := treap.min()
+	for err != nil {
+		k, v, ok, err = treap.min()
+	}
+	return
+}
+func (treap *Treap) min() (k Comparable, v Thing, ok bool, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.root == nil {
+		ok = false
+		return
+	}
+	k, v, ok, err = self.root.min(t)
+	return
+}
+func (treap *Treap) Max() (k Comparable, v Thing, ok bool) {
+	k, v, ok, err := treap.max()
+	for err != nil {
+		k, v, ok, err = treap.max()
+	}
+	return
+}
+func (treap *Treap) max() (k Comparable, v Thing, ok bool, err error) {
+	t := NewTransaction()
+	self, err := treap.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.root == nil {
+		ok = false
+		return
+	}
+	k, v, ok, err = self.root.max(t)
 	return
 }
 func (treap *Treap) put(k Comparable, v Thing) (old Thing, ok bool, err error) {
@@ -210,6 +270,52 @@ func (handle *nodeHandle) wopen(t *Transaction) (*node, error) {
 		return nil, err
 	}
 	return r.(*node), nil
+}
+func (handle *nodeHandle) get(t *Transaction, k Comparable) (v Thing, ok bool, err error) {
+	if handle == nil {
+		ok = false
+		return
+	}
+	self, err := handle.ropen(t)
+	if err != nil {
+		return
+	}
+	switch cmp := k.Compare(handle.key); {
+	case cmp < 0:
+		v, ok, err = self.left.get(t, k)
+	case cmp > 0:
+		v, ok, err = self.right.get(t, k)
+	default:
+		v = self.value
+		ok = true
+	}
+	return
+}
+func (handle *nodeHandle) min(t *Transaction) (k Comparable, v Thing, ok bool, err error) {
+	self, err := handle.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.left == nil {
+		k = handle.key
+		v = self.value
+		ok = true
+		return
+	}
+	return self.left.min(t)
+}
+func (handle *nodeHandle) max(t *Transaction) (k Comparable, v Thing, ok bool, err error) {
+	self, err := handle.ropen(t)
+	if err != nil {
+		return
+	}
+	if self.right == nil {
+		k = handle.key
+		v = self.value
+		ok = true
+		return
+	}
+	return self.left.max(t)
 }
 func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int) error {
 	self, err := handle.ropen(t)

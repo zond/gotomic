@@ -3,23 +3,38 @@ package gotomic
 
 import (
 	"testing"
-	"fmt"
 )
 
-func TestFoo(t *testing.T) {
+func TestPutGetDelete(t *testing.T) {
 	treap := NewTreap()
-	for i := 0; i < 100; i++ {
-		treap.Put(c(i), 100)
+	_, ok := treap.Get(c(3))
+	if ok {
+		t.Error("should not contain 3")
 	}
-	fmt.Println(treap.Describe())
-}
-
-func TestBar(t *testing.T) {
-	treap := NewTreap()
-	for i := 0; i < 10; i++ {
-		treap.Put(c(i), 100)
+	treap.Put(c(3), 44)
+	v, ok := treap.Get(c(3))
+	if !ok {
+		t.Error("should contain 3")
 	}
-	fmt.Println(treap.Describe())
-	treap.Delete(c(4))
-	fmt.Println(treap.Describe())
+	if v != 44 {
+		t.Error("should be 44")
+	}
+	v, ok = treap.Delete(c(3))
+	if !ok {
+		t.Error("should contain 3")
+	}
+	if v != 44 {
+		t.Error("should be 44")
+	}
+	v, ok = treap.Get(c(3))
+	if ok {
+		t.Error("should not contain 3")
+	}
+	v, ok = treap.Delete(c(3))
+	if v == 44 {
+		t.Error("should not be 44")
+	}
+	if ok {
+		t.Error("should not contain 3")
+	}
 }
