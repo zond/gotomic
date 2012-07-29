@@ -10,6 +10,8 @@ The `Hash` type is implemented using [Split-Ordered Lists: Lock-Free Extensible 
 
 The `Transaction` type is implemented using OSTM from [Concurrent Programming Without Locks by Keir Fraser and Tim Harris](http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf) with a few tweaks described in https://github.com/zond/gotomic/blob/master/stm.go.
 
+The `Treap` type uses `Transaction` to be non blocking and thread safe, and is based (like all other treaps, I guess) on [Randomized Search Trees by Cecilia Aragon and Raimund Seidel](http://faculty.washington.edu/aragon/pubs/rst89.pdf), but mostly I just used https://github.com/stathat/treap/blob/master/treap.go for reference.
+
 ## Performance
 
 On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
