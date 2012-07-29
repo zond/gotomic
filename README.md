@@ -50,9 +50,9 @@ http://go.pkgdoc.org/github.com/zond/gotomic
 
 ## Bugs
 
-No known bugs in `Hash` and `List`.
+`Hash` and `List` have no known bugs and seem to work well.
 
-The `Transaction` and `Handle` types are alpha and I wouldn't trust them yet, even if they no longer fail the tests..
+The `Transaction`, `Handle` and `Treap` types are alpha and I wouldn't trust them yet.
 
 I have not tried it on more than my personal laptop however, so if you want to try and force it to misbehave on a heftier machine than a 4 cpu MacBook Air please do!
 

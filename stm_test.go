@@ -304,7 +304,7 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 						if err == nil {
 							looked = true
 							if !ok {
-								fmt.Printf("%v should contain %v\n", h, v)
+								t.Fatalf("%v should contain %v\n", h, v)
 							}
 						}
 					}
@@ -329,13 +329,13 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 							if err == nil {
 								looked = true
 								if ok {
-									fmt.Printf("%v should not contain %v\n", h, v)
+									t.Fatalf("%v should not contain %v\n", h, v)
 								}
 							}
 						}
 					}
 				} else {
-					fmt.Println("wtf, ", v, "is not in", h)
+					t.Fatalf("wtf, ", v, "is not in", h)
 				}
 			}
 		}
