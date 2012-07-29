@@ -171,16 +171,13 @@ func (self *Transaction) release() {
 	stat := self.getStatus()
 	for _, w := range self.sortedWrites {
 		current := w.handle.getVersion()
-		for current.lockedBy == self {
+		if current.lockedBy == self {
 			wanted := w.snapshot.old
 			if stat == successful {
 				wanted = w.snapshot.neu
 				wanted.commitNumber = self.commitNumber
 			}
-			if w.handle.replace(current, wanted) {
-				break
-			}
-			current = w.handle.getVersion()
+			w.handle.replace(current, wanted)
 		}
 	}
 }
@@ -193,11 +190,15 @@ func (self *Transaction) acquire() bool {
 				break
 			}
 			current := w.handle.getVersion()
-			if current.lockedBy == nil {
-				return false
-			}
 			if current.lockedBy == self {
 				break
+			}
+			if current.lockedBy == nil {
+				if self.getStatus() == successful {
+					break
+				} else {
+					return false
+				}
 			}
 			current.lockedBy.commit()
 		}
