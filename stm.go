@@ -41,7 +41,7 @@ func NewHandle(c Clonable) *Handle {
 }
 
 /*
- Current returns the current content of this Handler, disregarding any transactional state.
+ Current returns the current content of this Handle, disregarding any transactional state.
 */
 func (self *Handle) Current() Clonable {
 	return self.getVersion().content
@@ -63,7 +63,7 @@ type version struct {
 	*/
 	lockedBy *Transaction
 	/*
-		The content in this version.
+	 The content in this version.
 	*/
 	content Clonable
 }
@@ -135,23 +135,27 @@ func (self *Transaction) getStatus() int32 {
 }
 func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	version := h.getVersion()
-	for {
-		if version.commitNumber > self.commitNumber {
-			err = fmt.Errorf("%v has changed", h.getVersion().content)
-			break
-		}
-		other := version.lockedBy
-		if other == nil {
-			rval = version
-			break
-		}
-		if other.getStatus() == read_check && self.getStatus() == read_check && self.commitNumber < other.commitNumber {
+	if version.commitNumber > self.commitNumber {
+		err = fmt.Errorf("%v has changed", h.getVersion().content)
+		return
+	}
+	other := version.lockedBy
+	if other == nil {
+		rval = version
+		return
+	}
+	if other.getStatus() == read_check {
+		if self.getStatus() == read_check && self.commitNumber < other.commitNumber {
 			other.Abort()
 		} else {
 			other.commit()
 		}
-		version = h.getVersion()
 	}
+	if other.getStatus() == successful {
+		err = fmt.Errorf("%v has changed", h.getVersion().content)
+		return
+	}
+	rval = version
 	return
 }
 
@@ -193,12 +197,16 @@ func (self *Transaction) acquire() bool {
 			if current.lockedBy == self {
 				break
 			}
+			switch status := self.getStatus(); status {
+			case read_check:
+				return true
+			case successful:
+				return true
+			case failed:
+				return false
+			}
 			if current.lockedBy == nil {
-				if self.getStatus() == successful {
-					break
-				} else {
-					return false
-				}
+				return false
 			}
 			current.lockedBy.commit()
 		}
@@ -208,6 +216,9 @@ func (self *Transaction) acquire() bool {
 func (self *Transaction) readCheck() bool {
 	for handle, snapshot := range self.readHandles {
 		if handle.getVersion() != snapshot.old {
+			if self.getStatus() == successful {
+				return true
+			}
 			return false
 		}
 	}
@@ -233,8 +244,7 @@ func (self *Transaction) commit() bool {
 		self.Abort()
 		return false
 	}
-	atomic.StoreInt32(&self.status, successful)
-	return true
+	return atomic.CompareAndSwapInt32(&self.status, read_check, successful)
 }
 
 /*
