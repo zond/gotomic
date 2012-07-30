@@ -8,10 +8,6 @@ The `List` type is implemented using [A Pragmatic Implementation of Non-Blocking
 
 The `Hash` type is implemented using [Split-Ordered Lists: Lock-Free Extensible Hash Tables by Ori Shalev and Nir Shavit](http://www.cs.ucf.edu/~dcm/Teaching/COT4810-Spring2011/Literature/SplitOrderedLists.pdf) with the List type used as backend.
 
-The `Transaction` type is implemented using OSTM from [Concurrent Programming Without Locks by Keir Fraser and Tim Harris](http://www.cl.cam.ac.uk/research/srg/netos/papers/2007-cpwl.pdf) with a few tweaks described in https://github.com/zond/gotomic/blob/master/stm.go.
-
-The `Treap` type uses `Transaction` to be non blocking and thread safe, and is based (like all other treaps, I guess) on [Randomized Search Trees by Cecilia Aragon and Raimund Seidel](http://faculty.washington.edu/aragon/pubs/rst89.pdf), but mostly I just used https://github.com/stathat/treap/blob/master/treap.go for reference.
-
 ## Performance
 
 On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
@@ -55,8 +51,6 @@ http://go.pkgdoc.org/github.com/zond/gotomic
 ## Bugs
 
 `Hash` and `List` have no known bugs and seem to work well.
-
-The `Transaction`, `Handle` and `Treap` types are alpha and I wouldn't trust them yet.
 
 I have not tried it on more than my personal laptop however, so if you want to try and force it to misbehave on a heftier machine than a 4 cpu MacBook Air please do!
 
