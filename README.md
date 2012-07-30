@@ -36,9 +36,11 @@ c)
     BenchmarkHash      500000	      5146 ns/op
     BenchmarkHashConc	  500000	     10599 ns/op
 
-Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive RWMutex wrapped native map b) is much faster at single thread operation, and about as efficient in multi thread operation, compared to c).
+Also, there are some third party benchmarks available at https://github.com/zond/gotomic/wiki/Benchmarks.
 
-I find it likely that c) is more efficient than b) at higher levels of concurrency, but for regular uses an RWMutex wrapped `map` is probably a safer bet.
+Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive RWMutex wrapped native map b) is much faster at single thread operation, and on a weak laptop about as efficient in multi thread operation, compared to c).
+
+However, on more multicored systems (and also a few smaller ones, strangely enough) c) is more efficient than b).
 
 ## Usage
 
