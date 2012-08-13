@@ -3,9 +3,81 @@ package gotomic
 
 import (
 	"testing"
+	"runtime"
 	"reflect"
+	"math/rand"
 	"fmt"
 )
+
+type s string
+func (self s) Compare(t Thing) int {
+	if other, ok := t.(s); ok {
+		return compStrings(string(self), string(other))
+	}
+	panic(fmt.Errorf("%#v can only compare to other s's, not %#v of type %T", self, t, t))
+}
+
+func fiddleTreap(t *testing.T, treap *Treap, x string, do, done chan bool) {
+	<- do
+	n := int(10000 + rand.Int31() % 1000)
+	vals := make([]s, n)
+	for i := 0; i < n; i++ {
+		v := s(fmt.Sprint(rand.Int63(), ".", i, ".", x))
+		vals[i] = v
+		_, ok := treap.Put(v, v)
+		if ok {
+			fmt.Printf("1 %v should not contain %v\n", treap.Describe(), v)
+			t.Fatalf("1 %v should not contain %v\n", treap.Describe(), v)
+		}
+ 		value, ok := treap.Get(v)
+		if !ok {
+			fmt.Printf("2 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("2 %v should contain %v\n", treap.Describe(), v)
+		}
+		if v.Compare(value) != 0 {
+			fmt.Printf("3 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("3 %v should contain %v\n", treap.Describe(), v)
+		}
+	} 
+	for i := 0; i < n; i++ {
+		v := vals[i]
+		old, ok := treap.Delete(v)
+		if !ok {
+			fmt.Printf("4 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("4 %v should contain %v\n", treap.Describe(), v)
+		}
+		if old != v {
+			fmt.Printf("5 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("5 %v should contain %v\n", treap.Describe(), v)
+		}
+		_, ok = treap.Get(v)
+		if ok {
+			fmt.Printf("6 %v should not contain %v\n", treap.Describe(), v)
+			t.Fatalf("6 %v should not contain %v\n", treap.Describe(), v)
+		}
+	}
+	done <- true
+}
+
+func TestTreapConc(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	treap := NewTreap()
+	for i := 9; i >= 0; i-- {
+		v := s(fmt.Sprint(i))
+		treap.Put(v, v)
+	}
+	assertTreapSlice(t, treap, []Comparable{s("0"), s("1"), s("2"), s("3"), s("4"), s("5"), s("6"), s("7"), s("8"), s("9")}, []Thing{s("0"), s("1"), s("2"), s("3"), s("4"), s("5"), s("6"), s("7"), s("8"), s("9")})
+	do := make(chan bool)
+	done := make(chan bool)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go fiddleTreap(t, treap, fmt.Sprint("fiddler-", i, "-"), do, done)
+	}
+	close(do)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		<-done
+	}
+	assertTreapSlice(t, treap, []Comparable{s("0"), s("1"), s("2"), s("3"), s("4"), s("5"), s("6"), s("7"), s("8"), s("9")}, []Thing{s("0"), s("1"), s("2"), s("3"), s("4"), s("5"), s("6"), s("7"), s("8"), s("9")})
+}
 
 func TestTreapPreviousNext(t *testing.T) {
 	treap := NewTreap()

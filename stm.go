@@ -135,27 +135,24 @@ func (self *Transaction) getStatus() int32 {
 }
 func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	version := h.getVersion()
-	if version.commitNumber > self.commitNumber {
-		err = fmt.Errorf("%v has changed", h.getVersion().content)
-		return
-	}
 	other := version.lockedBy
-	if other == nil {
-		rval = version
-		return
-	}
-	if other.getStatus() == read_check {
-		if self.getStatus() == read_check && self.commitNumber < other.commitNumber {
-			other.Abort()
-		} else {
-			other.commit()
+	if other != nil {
+		if other.getStatus() == read_check {
+			if self.getStatus() == read_check && self.commitNumber < other.commitNumber {
+				other.Abort()
+			} else {
+				other.commit()
+			}
+		}
+		if other.getStatus() == successful {
+			version = other.writeHandles[h].neu
 		}
 	}
-	if other.getStatus() == successful {
-		err = fmt.Errorf("%v has changed", h.getVersion().content)
-		return
+	if version.commitNumber > self.commitNumber {
+		err = fmt.Errorf("%v has changed", version.content)
+	} else {
+		rval = version
 	}
-	rval = version
 	return
 }
 
@@ -165,11 +162,10 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
  _not_ safe to call multiple times!
 */
 func (self *Transaction) sortWrites() {
-	for handle, _ := range self.writeHandles {
-		self.sortedWrites = append(self.sortedWrites, write{handle, self.writeHandles[handle]})
+	for handle, snapshot := range self.writeHandles {
+		self.sortedWrites = append(self.sortedWrites, write{handle, snapshot})
 	}
 	sort.Sort(self.sortedWrites)
-	self.writeHandles = nil
 }
 func (self *Transaction) release() {
 	stat := self.getStatus()
