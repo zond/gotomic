@@ -1,15 +1,15 @@
-
 package gotomic
 
 import (
-	"testing"
-	"runtime"
-	"reflect"
-	"math/rand"
 	"fmt"
+	"math/rand"
+	"reflect"
+	"runtime"
+	"testing"
 )
 
 type s string
+
 func (self s) Compare(t Thing) int {
 	if other, ok := t.(s); ok {
 		return compStrings(string(self), string(other))
@@ -18,42 +18,36 @@ func (self s) Compare(t Thing) int {
 }
 
 func fiddleTreap(t *testing.T, treap *Treap, x string, do, done chan bool) {
-	<- do
-	n := int(10000 + rand.Int31() % 1000)
+	<-do
+	n := int(10000 + rand.Int31()%1000)
 	vals := make([]s, n)
 	for i := 0; i < n; i++ {
 		v := s(fmt.Sprint(rand.Int63(), ".", i, ".", x))
 		vals[i] = v
 		_, ok := treap.Put(v, v)
 		if ok {
-			fmt.Printf("err#1 %v should not contain %v\n", treap.Describe(), v)
-			t.Fatalf("err#1 %v should not contain %v\n", treap.Describe(), v)
+			t.Errorf("err#1 %v should not contain %v\n", treap.Describe(), v)
 		}
- 		value, ok := treap.Get(v)
+		value, ok := treap.Get(v)
 		if !ok {
-			fmt.Printf("err#2 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("err#2 %v should contain %v\n", treap.Describe(), v)
+			t.Errorf("err#2 %v should contain %v\n", treap.Describe(), v)
 		}
 		if v.Compare(value) != 0 {
-			fmt.Printf("err#3 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("err#3 %v should contain %v\n", treap.Describe(), v)
+			t.Errorf("err#3 %v should contain %v\n", treap.Describe(), v)
 		}
-	} 
+	}
 	for i := 0; i < n; i++ {
 		v := vals[i]
 		old, ok := treap.Delete(v)
 		if !ok {
-			fmt.Printf("err#4 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("err#4 %v should contain %v\n", treap.Describe(), v)
+			t.Errorf("err#4 %v should contain %v\n", treap.Describe(), v)
 		}
 		if old != v {
-			fmt.Printf("err#5 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("err#5 %v should contain %v\n", treap.Describe(), v)
+			t.Errorf("err#5 %v should contain %v\n", treap.Describe(), v)
 		}
 		_, ok = treap.Get(v)
 		if ok {
-			fmt.Printf("err#6 %v should not contain %v\n", treap.Describe(), v)
-			t.Fatalf("err#6 %v should not contain %v\n", treap.Describe(), v)
+			t.Errorf("err#6 %v should not contain %v\n", treap.Describe(), v)
 		}
 	}
 	done <- true
@@ -84,7 +78,7 @@ func TestTreapPreviousNext(t *testing.T) {
 	for i := 9; i >= 0; i-- {
 		treap.Put(c(i), fmt.Sprint(i))
 	}
-	assertTreapSlice(t, treap, []Comparable{c(0), c(1), c(2), c(3), c(4), c(5), c(6), c(7), c(8), c(9)}, []Thing{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}) 
+	assertTreapSlice(t, treap, []Comparable{c(0), c(1), c(2), c(3), c(4), c(5), c(6), c(7), c(8), c(9)}, []Thing{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"})
 	k, v, ok := treap.Next(c(4))
 	if !ok {
 		t.Error("should have something after 4")

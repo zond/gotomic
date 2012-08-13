@@ -32,10 +32,10 @@ func compStrings(i, j string) int {
 }
 
 type testNode struct {
-	value string
+	value  string
 	parent *testNodeHandle
-	left  *testNodeHandle
-	right *testNodeHandle
+	left   *testNodeHandle
+	right  *testNodeHandle
 }
 
 func (self *testNode) Clone() Clonable {
@@ -285,8 +285,8 @@ func assertTreeStructure(t *testing.T, h *testNodeHandle, c *cmpNode) {
 }
 
 func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan bool) {
-	<- do
-	n := int(10000 + rand.Int31() % 1000)
+	<-do
+	n := int(10000 + rand.Int31()%1000)
 	vals := make([]string, n)
 	for i := 0; i < n; i++ {
 		v := fmt.Sprint(rand.Int63(), ".", i, ".", x)
@@ -300,7 +300,7 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 					looked := false
 					for !looked {
 						tr = NewTransaction()
- 						ok, err := h.has(tr, v)
+						ok, err := h.has(tr, v)
 						if err == nil {
 							looked = true
 							if !ok {
@@ -312,7 +312,7 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 				}
 			}
 		}
-	} 
+	}
 	for i := 0; i < n; i++ {
 		v := vals[i]
 		removed := false
@@ -326,7 +326,7 @@ func fiddleTestTree(t *testing.T, x string, h *testNodeHandle, do, done chan boo
 						looked := false
 						for !looked {
 							tr = NewTransaction()
- 							ok, err := h.has(tr, v)
+							ok, err := h.has(tr, v)
 							if err == nil {
 								looked = true
 								if ok {
@@ -370,7 +370,7 @@ func TestSTMConcurrentTestTree(t *testing.T) {
 	}
 	close(do)
 	for i := 0; i < runtime.NumCPU(); i++ {
-		<- done
+		<-done
 	}
 	assertTreeStructure(t, hc, &cmpNode{"c", &cmpNode{"a", nil, &cmpNode{"b", nil, nil}}, &cmpNode{"d", nil, nil}})
 }
@@ -388,7 +388,7 @@ func TestSTMBigTestTree(t *testing.T) {
 		if err == nil {
 			if tr.Commit() {
 				tr = NewTransaction()
- 				ok, err := hc.has(tr, v)
+				ok, err := hc.has(tr, v)
 				if err == nil {
 					if !ok {
 						t.Errorf("%v should contain %v", hc, v)
@@ -409,9 +409,9 @@ func TestSTMBigTestTree(t *testing.T) {
 		ok, err := hc.remove(tr, v)
 		if err == nil {
 			if ok {
-				if tr.Commit() { 
+				if tr.Commit() {
 					tr = NewTransaction()
- 					ok, err := hc.has(tr, v)
+					ok, err := hc.has(tr, v)
 					if err == nil {
 						if ok {
 							t.Errorf("%v should not contain %v", hc, v)

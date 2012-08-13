@@ -115,7 +115,7 @@ type Transaction struct {
 	/*
 	 Steadily incrementing number for each committed transaction.
 	*/
-	beginNumber uint64
+	beginNumber  uint64
 	commitNumber uint64
 	status       int32
 	readHandles  map[*Handle]*snapshot
@@ -250,7 +250,7 @@ func (self *Transaction) commit() bool {
 /*
  Commit the transaction. Will return whether the commit was successful or not.
 
- Safe to call multiple times.
+ Safe to call multiple times, but only from one thread.
 */
 func (self *Transaction) Commit() bool {
 	status := self.getStatus()

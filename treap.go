@@ -1,12 +1,11 @@
-
 package gotomic
 
 import (
-	"math/rand"
-	"time"
 	"bytes"
-	"sync/atomic"
 	"fmt"
+	"math/rand"
+	"sync/atomic"
+	"time"
 )
 
 func init() {
@@ -14,25 +13,26 @@ func init() {
 }
 
 type match struct {
-	previousOk bool
-	previousKey Comparable
+	previousOk    bool
+	previousKey   Comparable
 	previousValue Thing
-	matchOk bool
-	matchKey Comparable
-	matchValue Thing
-	nextOk bool
-	nextKey Comparable
-	nextValue Thing
+	matchOk       bool
+	matchKey      Comparable
+	matchValue    Thing
+	nextOk        bool
+	nextKey       Comparable
+	nextValue     Thing
 }
 
 type TreapIterator func(k Comparable, v Thing)
 
 /*
  Transaction controlled treap
- */
+*/
 type treap struct {
 	root *nodeHandle
 }
+
 func (self *treap) Clone() Clonable {
 	return &treap{self.root}
 }
@@ -78,17 +78,19 @@ func merge(t *Transaction, left, right *nodeHandle) (result *nodeHandle, err err
 
 /*
  Non-transaction controlled "user space" type
- */
+*/
 type Treap struct {
 	handle *Handle
-	size int64
+	size   int64
 }
+
 func NewTreap() *Treap {
 	return &Treap{NewHandle(&treap{}), 0}
 }
+
 /*
  Get a readable *treap from the Treap
- */
+*/
 func (self *Treap) ropen(t *Transaction) (*treap, error) {
 	r, err := t.Read(self.handle)
 	if err != nil {
@@ -96,9 +98,10 @@ func (self *Treap) ropen(t *Transaction) (*treap, error) {
 	}
 	return r.(*treap), nil
 }
+
 /*
  Get a writable *treap from the Treap
- */
+*/
 func (self *Treap) wopen(t *Transaction) (*treap, error) {
 	r, err := t.Write(self.handle)
 	if err != nil {
@@ -333,12 +336,12 @@ func (treap *Treap) put(k Comparable, v Thing) (old Thing, ok bool, err error) {
 	return
 }
 
-
 type node struct {
-	left *nodeHandle
+	left  *nodeHandle
 	right *nodeHandle
 	value Thing
 }
+
 func (self *node) Clone() Clonable {
 	rval := *self
 	return &rval
@@ -346,9 +349,10 @@ func (self *node) Clone() Clonable {
 
 type nodeHandle struct {
 	*Handle
-	key Comparable
+	key    Comparable
 	weight int32
 }
+
 func (handle *nodeHandle) ropen(t *Transaction) (*node, error) {
 	n, err := t.Read((*Handle)(handle.Handle))
 	if err != nil {
@@ -462,14 +466,14 @@ func (handle *nodeHandle) describe(t *Transaction, buf *bytes.Buffer, indent int
 	fmt.Fprintf(buf, "%v => %v (%v)\n", handle.key, self.value, handle.weight)
 	if self.left != nil {
 		fmt.Fprintf(buf, "l:")
-		err = self.left.describe(t, buf, indent + 1)
+		err = self.left.describe(t, buf, indent+1)
 		if err != nil {
 			return err
 		}
 	}
 	if self.right != nil {
 		fmt.Fprintf(buf, "r:")
-		err = self.right.describe(t, buf, indent + 1)
+		err = self.right.describe(t, buf, indent+1)
 		if err != nil {
 			return err
 		}
@@ -515,7 +519,7 @@ func (handle *nodeHandle) del(t *Transaction, k Comparable) (result *nodeHandle,
 		return
 	}
 	result = handle
-	self, err := handle.ropen(t) 
+	self, err := handle.ropen(t)
 	if err != nil {
 		return
 	}
@@ -613,13 +617,11 @@ func (handle *nodeHandle) insert(t *Transaction, newHandle *nodeHandle) (result 
 		var newNode *node
 		newNode, err = newHandle.ropen(t)
 		if err != nil {
-			return 
+			return
 		}
 		old = self.value
 		ok = true
 		self.value = newNode.value
-	}	
+	}
 	return
 }
-
-	
