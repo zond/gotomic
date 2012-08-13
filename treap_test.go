@@ -26,34 +26,34 @@ func fiddleTreap(t *testing.T, treap *Treap, x string, do, done chan bool) {
 		vals[i] = v
 		_, ok := treap.Put(v, v)
 		if ok {
-			fmt.Printf("1 %v should not contain %v\n", treap.Describe(), v)
-			t.Fatalf("1 %v should not contain %v\n", treap.Describe(), v)
+			fmt.Printf("err#1 %v should not contain %v\n", treap.Describe(), v)
+			t.Fatalf("err#1 %v should not contain %v\n", treap.Describe(), v)
 		}
  		value, ok := treap.Get(v)
 		if !ok {
-			fmt.Printf("2 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("2 %v should contain %v\n", treap.Describe(), v)
+			fmt.Printf("err#2 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("err#2 %v should contain %v\n", treap.Describe(), v)
 		}
 		if v.Compare(value) != 0 {
-			fmt.Printf("3 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("3 %v should contain %v\n", treap.Describe(), v)
+			fmt.Printf("err#3 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("err#3 %v should contain %v\n", treap.Describe(), v)
 		}
 	} 
 	for i := 0; i < n; i++ {
 		v := vals[i]
 		old, ok := treap.Delete(v)
 		if !ok {
-			fmt.Printf("4 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("4 %v should contain %v\n", treap.Describe(), v)
+			fmt.Printf("err#4 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("err#4 %v should contain %v\n", treap.Describe(), v)
 		}
 		if old != v {
-			fmt.Printf("5 %v should contain %v\n", treap.Describe(), v)
-			t.Fatalf("5 %v should contain %v\n", treap.Describe(), v)
+			fmt.Printf("err#5 %v should contain %v\n", treap.Describe(), v)
+			t.Fatalf("err#5 %v should contain %v\n", treap.Describe(), v)
 		}
 		_, ok = treap.Get(v)
 		if ok {
-			fmt.Printf("6 %v should not contain %v\n", treap.Describe(), v)
-			t.Fatalf("6 %v should not contain %v\n", treap.Describe(), v)
+			fmt.Printf("err#6 %v should not contain %v\n", treap.Describe(), v)
+			t.Fatalf("err#6 %v should not contain %v\n", treap.Describe(), v)
 		}
 	}
 	done <- true

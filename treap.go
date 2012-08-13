@@ -156,11 +156,11 @@ func (treap *Treap) del(k Comparable) (old Thing, ok bool, err error) {
 		}
 		self.root = newRoot
 	}
-	if !t.Commit() {
+	if t.Commit() {
+		atomic.AddInt64(&treap.size, -1)
+	} else {
 		err = fmt.Errorf("%v changed during delete", treap)
-		return 
 	}
-	atomic.AddInt64(&treap.size, -1)
 	return
 }
 func (treap *Treap) Put(k Comparable, v Thing) (old Thing, ok bool) {
@@ -325,10 +325,11 @@ func (treap *Treap) put(k Comparable, v Thing) (old Thing, ok bool, err error) {
 		}
 		self.root = newRoot
 	}
-	if !t.Commit() {
+	if t.Commit() {
+		atomic.AddInt64(&treap.size, 1)
+	} else {
 		err = fmt.Errorf("%v changed during put", treap)
 	}
-	atomic.AddInt64(&treap.size, 1)
 	return
 }
 

@@ -15,6 +15,7 @@ const (
 )
 
 var lastCommit uint64 = 0
+var lastBegin uint64 = 0
 
 /*
  Clonable types can be handled by the transaction layer.
@@ -114,6 +115,7 @@ type Transaction struct {
 	/*
 	 Steadily incrementing number for each committed transaction.
 	*/
+	beginNumber uint64
 	commitNumber uint64
 	status       int32
 	readHandles  map[*Handle]*snapshot
@@ -123,6 +125,7 @@ type Transaction struct {
 
 func NewTransaction() *Transaction {
 	return &Transaction{
+		atomic.AddUint64(&lastBegin, 1),
 		atomic.LoadUint64(&lastCommit),
 		undecided,
 		make(map[*Handle]*snapshot),
@@ -138,7 +141,7 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	other := version.lockedBy
 	if other != nil {
 		if other.getStatus() == read_check {
-			if self.getStatus() == read_check && self.commitNumber < other.commitNumber {
+			if self.getStatus() == read_check && self.beginNumber < other.beginNumber {
 				other.Abort()
 			} else {
 				other.commit()
@@ -240,7 +243,8 @@ func (self *Transaction) commit() bool {
 		self.Abort()
 		return false
 	}
-	return atomic.CompareAndSwapInt32(&self.status, read_check, successful)
+	atomic.CompareAndSwapInt32(&self.status, read_check, successful)
+	return self.getStatus() == successful
 }
 
 /*
