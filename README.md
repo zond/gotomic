@@ -47,7 +47,7 @@ e)
 
 Also, there are some third party benchmarks available at https://github.com/zond/gotomic/wiki/Benchmarks.
 
-Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive RWMutex wrapped native map b) is much faster at single thread operation, and on a weak laptop about as efficient in multi thread operation, compared to c).
+Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive `RWMutex` wrapped native map b) is much faster at single thread operation, and on a weak laptop about as efficient in multi thread operation, compared to c).
 
 However, on more multicored systems (and also a few smaller ones, strangely enough) c) is more efficient than b).
 
