@@ -39,8 +39,7 @@ type testNode struct {
 }
 
 func (self *testNode) Clone() Clonable {
-	rval := *self
-	return &rval
+	return &testNode{fmt.Sprint(self.value), self.parent, self.left, self.right}
 }
 
 type testNodeHandle Handle
@@ -652,15 +651,17 @@ func fiddleTrans(t *testing.T, x string, h1, h2 *Handle, do, done chan bool) {
 		n2, err2 := tr.Write(h2)
 		if err1 == nil && err2 == nil {
 			if n1.(*testNode).value != n2.(*testNode).value {
-				t.Errorf("%v, %v: %v should == %v", x, i, n1, n2)
+				t.Errorf("Write: thread %v, loop %v: %v should == %v in %v", x, i, n1, n2, tr.Describe())
 			}
-			n1.(*testNode).value = x
-			n2.(*testNode).value = x
+			newVal := fmt.Sprint(x, i)
+			n1.(*testNode).value = newVal
+			n2.(*testNode).value = newVal
+			tr.Commit()
 			tr = NewTransaction()
 			n1, err1 = tr.Read(h1)
 			n2, err2 = tr.Read(h2)
 			if err1 == nil && err2 == nil && n1.(*testNode).value != n2.(*testNode).value {
-				t.Errorf("%v, %v: %v should == %v", x, i, n1, n2)
+				t.Errorf("Read: thread %v, loop %v: %v should == %v in %v", x, i, n1, n2, tr.Describe())
 			}
 		}
 	}

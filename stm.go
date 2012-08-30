@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"sync/atomic"
+	"bytes"
 	"unsafe"
 )
 
@@ -70,10 +71,7 @@ type version struct {
 }
 
 func (self *version) clone() *version {
-	newVersion := *self
-	newVersion.content = self.content.Clone()
-	newVersion.lockedBy = nil
-	return &newVersion
+	return &version{self.commitNumber, nil, self.content.Clone()}
 }
 
 type snapshot struct {
@@ -85,6 +83,7 @@ type write struct {
 	handle   *Handle
 	snapshot *snapshot
 }
+
 type writes []write
 
 func (self writes) Len() int {
@@ -140,15 +139,14 @@ func (self *Transaction) objRead(h *Handle) (rval *version, err error) {
 	version := h.getVersion()
 	other := version.lockedBy
 	if other != nil {
-		if other.getStatus() == read_check {
-			if self.getStatus() == read_check && self.beginNumber < other.beginNumber {
-				other.Abort()
-			} else {
-				other.commit()
-			}
+		if other.getStatus() == read_check && self.getStatus() == read_check && self.beginNumber < other.beginNumber {
+			other.Abort()
+		} else {
+			other.commit()
 		}
 		if other.getStatus() == successful {
 			version = other.writeHandles[h].neu
+			version.commitNumber = other.commitNumber
 		}
 	}
 	if version.commitNumber > self.commitNumber {
@@ -281,6 +279,18 @@ func (self *Transaction) Abort() {
 		stat = self.getStatus()
 	}
 	self.release()
+}
+
+func (self *Transaction) Describe() string {
+	buf := bytes.NewBufferString(fmt.Sprintf("Transaction:%p (beginNumber: %v, commitNumber: %v):\n readHandles:\n", self, self.beginNumber, self.commitNumber))
+	for _, snapshot := range self.readHandles {
+		fmt.Fprintf(buf, "  %v (%v) => %v\n", snapshot.old.content, snapshot.old.commitNumber, snapshot.neu.content)
+	}
+	fmt.Fprint(buf, " writeHandles:\n")
+	for _, snapshot := range self.writeHandles {
+		fmt.Fprintf(buf, "  %v (%v) => %v\n", snapshot.old.content, snapshot.old.commitNumber, snapshot.neu.content)
+	}
+	return string(buf.Bytes())
 }
 
 /*
