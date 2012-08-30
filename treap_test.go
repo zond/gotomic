@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	stathat "github.com/stathat/treap"
 )
 
 type s string
@@ -243,4 +244,70 @@ func TestTreapMax(t *testing.T) {
 	if v != "4" {
 		t.Error("max should be 4")
 	}
+}
+
+type compInt int
+
+func (self compInt) Compare(t Thing) int {
+	if i, ok := t.(compInt); ok {
+		if i > self {
+			return 1
+		} else if i < self {
+			return -1
+		}
+	}
+	return 0
+}
+
+func BenchmarkStatHatTreap(b *testing.B) {
+	m := stathat.NewTree(func(i, j interface{}) bool {
+		return i.(int) < j.(int)
+	})
+	for i := 0; i < b.N; i++ {
+		k := rand.Int()
+		m.Insert(k, i)
+		j := m.Get(k)
+		if j != i {
+			b.Error("should be same value")
+		}
+	}
+}
+
+func BenchmarkTreap(b *testing.B) {
+	m := NewTreap()
+	for i := 0; i < b.N; i++ {
+		k := compInt(rand.Int())
+		m.Put(k, i)
+		j, _ := m.Get(k)
+		if j != i {
+			b.Error("should be same value")
+		}
+	}
+}
+
+func treapAction(b *testing.B, m *Treap, i int, do, done chan bool) {
+	<-do
+	for j := 0; j < i; j++ {
+		k := compInt(rand.Int())
+		m.Put(k, rand.Int())
+		m.Get(k)
+	}
+	done <- true
+}
+
+func BenchmarkTreapConc(b *testing.B) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	do := make(chan bool)
+	done := make(chan bool)
+	m := NewTreap()
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go treapAction(b, m, b.N, do, done)
+	}
+	close(do)
+	b.StartTimer()
+	for i := 0; i < runtime.NumCPU(); i++ {
+		<-done
+	}
+	b.StopTimer()
+	runtime.GOMAXPROCS(1)
 }
