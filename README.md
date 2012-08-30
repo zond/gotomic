@@ -14,9 +14,9 @@ The `Treap` type uses `Transaction` to be non blocking and thread safe, and is b
 
 ## Performance
 
-On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142) and c) the `gotomic.Hash` type.
+On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142), c) the `gotomic.Hash`, d) the `gotomic.Treap` type and e) the `github.com/stathat/treap.Tree` type.
 
-The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L83 and the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L116.
+The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L83, the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L116 and the benchmark for d) and e) at https://github.com/zond/gotomic/blob/master/hash_test.go#L262.
 
 The TL;DR of it all is that the benchmark sets `runtime.GOMAXPROCS` to be `runtime.NumCPU()`, and starts that number of `goroutine`s that just mutates and reads the tested mapping.
 
@@ -36,11 +36,20 @@ c)
     BenchmarkHash      500000	      5146 ns/op
     BenchmarkHashConc	  500000	     10599 ns/op
 
+d)
+    BenchmarkTreap	   50000	     71250 ns/op
+    BenchmarkTreapConc	   10000	    110843 ns/op
+
+e)
+    BenchmarkStatHatTreap	 1000000	      4373 ns/op
+
 Also, there are some third party benchmarks available at https://github.com/zond/gotomic/wiki/Benchmarks.
 
 Conclusion: As expected a) is by far the fastest mapping, and it seems that the naive RWMutex wrapped native map b) is much faster at single thread operation, and on a weak laptop about as efficient in multi thread operation, compared to c).
 
 However, on more multicored systems (and also a few smaller ones, strangely enough) c) is more efficient than b).
+
+When it comes to the treap class, I am afraid my implementation of STM is really REALLY inefficient. Maybe because I tried to be clever, or because I just botched it someplace. It seems to work, but I reckon that an `RWMutex`-wrapped stathat treap would be preferable in most circumstances.
 
 ## Usage
 
@@ -56,7 +65,7 @@ http://go.pkgdoc.org/github.com/zond/gotomic
 
 `Hash` and `List` have no known bugs and seem to work well.
 
-The `Transaction`, `Handle` and `Treap` types are alpha and I wouldn't trust them yet.
+The `Transaction`, `Handle` and `Treap` types are alpha. They seem to work, but are too slow and untrustworthy :/
 
 I have not tried it on more than my personal laptop however, so if you want to try and force it to misbehave on a heftier machine than a 4 cpu MacBook Air please do!
 
