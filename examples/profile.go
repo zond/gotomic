@@ -4,34 +4,35 @@ package main
 import (
 	gotomic "../"
 	"runtime/pprof"
-	"fmt"
 	"runtime"
 	"math/rand"
 	"time"
 	"os"
 )
 
-type hashInt int
-func (self hashInt) HashCode() uint32 {
-	return uint32(self)
-}
-func (self hashInt) Equals(t gotomic.Thing) bool {
-	if i, ok := t.(hashInt); ok {
-		return i == self
-	} 
-	return false
+type compInt int
+
+func (self compInt) Compare(t gotomic.Thing) int {
+	if i, ok := t.(compInt); ok {
+		if i > self {
+			return 1
+		} else if i < self {
+			return -1
+		}
+	}
+	return 0
 }
 
-func work(h *gotomic.Hash, n int, do, done chan bool) {
+func work(h *gotomic.Treap, n int, do, done chan bool) {
 	<- do
+	keys := make([]compInt, n)
 	for i := 0; i < n; i++ {
-		k := hashInt(i)
+		k := compInt(rand.Int())
+		keys[i] = k
 		h.Put(k, i)
 	}
 	for i := 0; i < n; i++ {
-		if hv, _ := h.Get(hashInt(i)); hv != i {
-			fmt.Println("bad value in hash, expected ", i, " but got ", hv)
-		}
+		h.Get(keys[i])
 	}
 	done <- true
 }
@@ -51,10 +52,10 @@ func main() {
 	defer pprof.StopCPUProfile()	
 	defer pprof.WriteHeapProfile(f2)
 
-	h := gotomic.NewHash()
+	h := gotomic.NewTreap()
 	do := make(chan bool)
 	done := make(chan bool)
-	n := 1000000
+	n := 100000
 	go work(h, n, do, done)
 	go work(h, n, do, done)
 	go work(h, n, do, done)
