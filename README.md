@@ -37,10 +37,12 @@ c)
     BenchmarkHashConc	  500000	     10599 ns/op
 
 d)
+
     BenchmarkTreap	   50000	     71250 ns/op
     BenchmarkTreapConc	   10000	    110843 ns/op
 
 e)
+
     BenchmarkStatHatTreap	 1000000	      4373 ns/op
 
 Also, there are some third party benchmarks available at https://github.com/zond/gotomic/wiki/Benchmarks.
