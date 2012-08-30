@@ -14,7 +14,7 @@ The `Treap` type uses `Transaction` to be non blocking and thread safe, and is b
 
 ## Performance
 
-On my laptop I created three different benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142), c) the `gotomic.Hash`, d) the `gotomic.Treap` type and e) the `github.com/stathat/treap.Tree` type.
+On my laptop I created benchmarks for a) regular Go `map` types, b) [Go `map` types protected by `sync.RWMutex`](https://github.com/zond/tools/blob/master/tools.go#L142), c) the `gotomic.Hash`, d) the `gotomic.Treap` type and e) the `github.com/stathat/treap.Tree` type.
 
 The benchmarks for a) and b) can be found at https://github.com/zond/tools/blob/master/tools_test.go#L83, the benchmark for c) at https://github.com/zond/gotomic/blob/master/hash_test.go#L116 and the benchmark for d) and e) at https://github.com/zond/gotomic/blob/master/hash_test.go#L262.
 
