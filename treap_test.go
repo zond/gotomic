@@ -296,6 +296,7 @@ func treapAction(b *testing.B, m *Treap, i int, do, done chan bool) {
 }
 
 func BenchmarkTreapConc(b *testing.B) {
+	b.StopTimer()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	do := make(chan bool)
 	done := make(chan bool)
@@ -308,6 +309,5 @@ func BenchmarkTreapConc(b *testing.B) {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		<-done
 	}
-	b.StopTimer()
 	runtime.GOMAXPROCS(1)
 }

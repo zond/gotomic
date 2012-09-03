@@ -113,6 +113,7 @@ func action(b *testing.B, m *Hash, i int, do, done chan bool) {
 }
 
 func BenchmarkHashConc(b *testing.B) {
+	b.StopTimer()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	do := make(chan bool)
 	done := make(chan bool)
@@ -125,7 +126,6 @@ func BenchmarkHashConc(b *testing.B) {
 	for i := 0; i < runtime.NumCPU(); i++ {
 		<-done
 	}
-	b.StopTimer()
 	runtime.GOMAXPROCS(1)
 }
 
