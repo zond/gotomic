@@ -214,17 +214,47 @@ func TestHashEach(t *testing.T) {
 	h.Put(StringKey("b"), "2")
 	h.Put(StringKey("c"), "3")
 	h.Put(StringKey("d"), "4")
+
 	cmp := make(map[Hashable]Thing)
 	cmp[StringKey("a")] = "1"
 	cmp[StringKey("b")] = "2"
 	cmp[StringKey("c")] = "3"
 	cmp[StringKey("d")] = "4"
+
 	m := make(map[Hashable]Thing)
-	h.Each(func(k Hashable, v Thing) {
+
+	h.Each(func(k Hashable, v Thing) bool {
 		m[k] = v
+		return false
 	})
+
 	if !reflect.DeepEqual(cmp, m) {
 		t.Error(m, "should be", cmp)
+	}
+}
+
+func TestHashEachInterrupt(t *testing.T) {
+	h := NewHash()
+	h.Put(StringKey("a"), "1")
+	h.Put(StringKey("b"), "2")
+	h.Put(StringKey("c"), "3")
+	h.Put(StringKey("d"), "4")
+
+	m := make(map[Hashable]Thing)
+
+	interrupted := h.Each(func(k Hashable, v Thing) bool {
+		m[k] = v
+		
+		// Break the iteration when we reach 2 elements
+		return len(m) == 2
+	})
+
+	if !interrupted {
+		t.Error("Iteration should have been interrupted.")
+	}
+
+	if len(m) != 2 {
+		t.Error(m, "should have 2 elements. Have", len(m))
 	}
 }
 

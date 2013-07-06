@@ -174,13 +174,42 @@ func TestListEach(t *testing.T) {
 	nr.add("d")
 	nr.add("c")
 	nr.add("b")
+
 	var a []Thing
-	nr.each(func(t Thing) {
+
+	nr.each(func(t Thing) bool {
 		a = append(a, t)
+		return false
 	})
+
 	exp := []Thing{nil, "b", "c", "d", "f", "g", "h"}
 	if !reflect.DeepEqual(a, exp) {
 		t.Error(a, "should be", exp)
+	}
+}
+
+func TestListEachInterrupt(t *testing.T) {
+	nr := new(element)
+	nr.add("h")
+	nr.add("g")
+	nr.add("f")
+	nr.add("d")
+	nr.add("c")
+	nr.add("b")
+
+	var a []Thing
+
+	interrupted := nr.each(func(t Thing) bool {
+		a = append(a, t)
+		return len(a) == 2
+	})
+
+	if !interrupted {
+		t.Error("Iteration should have been interrupted.")
+	}
+
+	if len(a) != 2 {
+		t.Error("List should have 2 elements. Have", len(a))
 	}
 }
 
