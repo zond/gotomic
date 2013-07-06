@@ -9,7 +9,7 @@ import (
 
 var deletedElement = "deleted"
 
-type ListIterator func(t Thing)
+type ListIterator func(t Thing) bool
 
 type hit struct {
 	left    *element
@@ -67,13 +67,16 @@ func (self *List) Pop() (rval Thing, ok bool) {
 
 /*
  Each will run i on each element.
+ 
+ It returns true if the iteration was interrupted.
+ This is the case when one of the ListIterator calls returned true, indicating
+ the iteration should be stopped.
 */
-func (self *List) Each(i ListIterator) {
+func (self *List) Each(i ListIterator) bool {
 	n := self.element.next()
-	if n != nil {
-		n.each(i)
-	}
+	return n != nil && n.each(i)
 }
+
 func (self *List) String() string {
 	return fmt.Sprint(self.ToSlice())
 }
@@ -147,13 +150,20 @@ func (self *element) next() *element {
 	*/
 	return nil
 }
-func (self *element) each(i ListIterator) {
+
+func (self *element) each(i ListIterator) bool {
 	n := self
+
 	for n != nil {
-		i(n.value)
+		if i(n.value) {
+			return true
+		}
 		n = n.next()
 	}
+
+	return false
 }
+
 func (self *element) val() Thing {
 	if self == nil {
 		return nil

@@ -11,7 +11,7 @@ import (
 const max_exponent = 32
 const default_load_factor = 0.5
 
-type HashIterator func(k Hashable, v Thing)
+type HashIterator func(k Hashable, v Thing) bool
 
 type hashHit hit
 
@@ -154,12 +154,15 @@ func (self *Hash) Size() int {
 
 /*
  Each will run i on each key and value.
+ 
+ It returns true if the iteration was interrupted.
+ This is the case when one of the HashIterator calls returned true, indicating
+ the iteration should be stopped.
 */
-func (self *Hash) Each(i HashIterator) {
-	self.getBucketByHashCode(0).each(func(t Thing) {
-		if e := t.(*entry); e.real() {
-			i(e.key, e.val())
-		}
+func (self *Hash) Each(i HashIterator) bool {
+	return self.getBucketByHashCode(0).each(func(t Thing) bool {
+		e := t.(*entry)
+		return e.real() && i(e.key, e.val())
 	})
 }
 
@@ -192,11 +195,15 @@ func (self *Hash) Verify() error {
 */
 func (self *Hash) ToMap() map[Hashable]Thing {
 	rval := make(map[Hashable]Thing)
-	self.Each(func(k Hashable, v Thing) {
+
+	self.Each(func(k Hashable, v Thing) bool {
 		rval[k] = v
+		return false
 	})
+
 	return rval
 }
+
 func (self *Hash) isBucket(n *element) (isBucket bool, index, superIndex, subIndex uint32) {
 	e := n.value.(*entry)
 	index = e.hashCode & ((1 << self.exponent) - 1)
