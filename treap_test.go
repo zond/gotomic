@@ -6,7 +6,8 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
-	stathat "github.com/stathat/treap"
+
+	stathat "stathat.com/c/treap"
 )
 
 type s string
