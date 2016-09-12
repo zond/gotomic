@@ -114,7 +114,7 @@ func assertPop(t *testing.T, nr *element, th Thing) {
 	}
 }
 
-func TestPushPop(t *testing.T) {
+func TestListPushPop(t *testing.T) {
 	nr := new(element)
 	assertSlicey(t, nr, []Thing{nil})
 	nr.add("hej")
@@ -133,7 +133,7 @@ func TestPushPop(t *testing.T) {
 	assertSlicey(t, nr, []Thing{nil})
 }
 
-func TestConcPushPop(t *testing.T) {
+func TestListConcPushPop(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	nr := new(element)
 	assertSlicey(t, nr, []Thing{nil})

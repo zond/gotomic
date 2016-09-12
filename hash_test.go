@@ -129,7 +129,7 @@ func BenchmarkHashConc(b *testing.B) {
 	runtime.GOMAXPROCS(1)
 }
 
-func TestPutIfPresent(t *testing.T) {
+func TestHashPutIfPresent(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
 	if h.PutIfPresent(StringKey("k"), StringKey("v"), StringKey("blabla")) {
@@ -158,7 +158,7 @@ func TestPutIfPresent(t *testing.T) {
 	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): StringKey("v3")})
 }
 
-func TestNilValues(t *testing.T) {
+func TestHashNilValues(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
 	h.Put(StringKey("k"), nil)
@@ -172,7 +172,7 @@ func TestNilValues(t *testing.T) {
 	}
 }
 
-func TestPutIfMissing(t *testing.T) {
+func TestHashPutIfMissing(t *testing.T) {
 	h := NewHash()
 	assertMappy(t, h, map[Hashable]Thing{})
 	if !h.PutIfMissing(StringKey("k"), "v") {
@@ -185,7 +185,7 @@ func TestPutIfMissing(t *testing.T) {
 	assertMappy(t, h, map[Hashable]Thing{StringKey("k"): "v"})
 }
 
-func TestConcurrency(t *testing.T) {
+func TestHashConcurrency(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	h := NewHash()
 	cmp := make(map[Hashable]Thing)
@@ -244,7 +244,7 @@ func TestHashEachInterrupt(t *testing.T) {
 
 	interrupted := h.Each(func(k Hashable, v Thing) bool {
 		m[k] = v
-		
+
 		// Break the iteration when we reach 2 elements
 		return len(m) == 2
 	})
